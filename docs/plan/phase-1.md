@@ -32,7 +32,7 @@ Format każdego zadania: zależności, zakres, kryteria akceptacji (co uruchomi�
 
 ### 1.0 Fundament
 
-#### P1-01 · Szkielet monorepo i aplikacji Tauri ✅ (instalator Windows potwierdzi CI z P1-02)
+#### P1-01 · Szkielet monorepo i aplikacji Tauri ✅
 
 - **Zależy od:** —
 - **Zakres:** Cargo workspace z `app/src-tauri`. npm workspaces z `app`. Puste `crates/lupa-testkit` i `packages/domain` powstają w pierwszych zadaniach, które ich potrzebują (P1-06 i P1-24), żeby nie commitować pustych modułów. Dalej: Vite + React + TypeScript `strict`, ESLint, Prettier, Vitest. Okno Tauri 2 z ekranem „Lupa” i restrykcyjnym CSP. Komendy z `architecture.md` w `package.json` i w sekcji „Komendy” w `CLAUDE.md`. Propozycja wzorców do `allow` w opisie zmiany. Wpisuje je człowiek, agent nie zmienia własnych uprawnień.
@@ -43,7 +43,7 @@ Format każdego zadania: zależności, zakres, kryteria akceptacji (co uruchomi�
   - `node --test .claude/hooks/hooks.test.mjs` nadal przechodzi.
 - **Rozmiar:** ~350 LOC, głównie konfiguracja.
 
-#### P1-02 · CI na Windows
+#### P1-02 · CI na Windows ✅
 
 - **Zależy od:** P1-01
 - **Zakres:** repo Lupy jest na GitHubie (`README.md`, „Mapa repo”), więc workflow GitHub Actions na hostowanym runnerze Windows (D8 w `decisions.md`): format, clippy, testy Rust, lint, typecheck, testy TS, testy hooków. Cache zależności. Bez sekretów.
@@ -94,7 +94,7 @@ Format każdego zadania: zależności, zakres, kryteria akceptacji (co uruchomi�
 - **Kryteria akceptacji:** testy: identyfikator pliku równy wynikowi `git hash-object`; plik ignorowany nie pojawia się; plik z CRLF w working tree i LF w indeksie przy `autocrlf=true` nie jest zmieniony; usunięty, ale nie zestage'owany plik jest widoczny jako usunięty.
 - **Rozmiar:** ~300 LOC.
 
-#### P1-08 · Diff linii
+#### P1-08 · Diff linii ✅
 
 - **Zależy od:** P1-06, S2
 - **Zakres:** `lupa-diff`: histogram przez `imara-diff` 0.2 (`Algorithm::Histogram` + `postprocess_lines`, wynik S2), bez jego drukarki unified, która przy hunkach blisko początku pliku dodaje linię kontekstu za dużo. Hunki z kontekstem liczy `lupa-diff`, hunki z konfigurowalnym kontekstem, opcja ignorowania białych znaków na początku linii („Ignoruj wcięcia” z makiety `Main`).
