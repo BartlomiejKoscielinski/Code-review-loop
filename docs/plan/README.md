@@ -11,7 +11,7 @@ Plan przekłada `docs/input/plan.md` i makiety z `docs/input/mocks/` na cztery f
 | [`phase-2.md`](phase-2.md) | całe review: skrzynka, reguły zespołu, trasa, komentarze, bramka, publikacja, interdiff, różnica ostrzeżeń |
 | [`phase-3.md`](phase-3.md) | AI (Claude Code) i semantyka (Roslyn), dowody z wykonania |
 | [`phase-4.md`](phase-4.md) | emulator, tryb nauki, pętla uczenia, metryki, audyty przed 1.0 |
-| [`open-questions.md`](open-questions.md) | rozbieżności z materiałami wejściowymi i pytania do zespołu |
+| [`decisions.md`](decisions.md) | decyzje domyślne, czego potrzeba od człowieka, różnice względem materiału wejściowego |
 
 Decyzje: [ADR 0002](../adr/0002-architecture-and-module-boundaries.md) (architektura), [ADR 0003](../adr/0003-review-target-model.md) (model celu review), [ADR 0004](../adr/0004-skip-build-vs-buy-phase.md) (bez fazy 0).
 
@@ -19,7 +19,7 @@ Decyzje: [ADR 0002](../adr/0002-architecture-and-module-boundaries.md) (architek
 
 | Faza | Wynik dla zespołu | Zadania | Spike'i i ADR | Bramka (skrót) |
 | --- | --- | --- | --- | --- |
-| 1 · Czytnik | lokalne zmiany, commit, branch i MR otwierane w Lupie i czytane szybciej niż w GitLabie | 33 | S1 widok diffa, S2 Git i diff, S3 możliwości GitLaba | diff zgodny z GitLabem na 20 MR, budżety wydajności, 3 osoby przez tydzień, metryki bazowe |
+| 1 · Czytnik | lokalne zmiany, commit, branch i MR otwierane w Lupie i czytane szybciej niż w GitLabie | 33 | S1 widok diffa, S2 Git i diff | diff zgodny z GitLabem na 20 MR, budżety wydajności, 3 osoby przez tydzień, metryki bazowe |
 | 2 · Całe review | skrzynka → briefing → trasa → bramka → publikacja → interdiff; self-review przed pushem | 38 | P2-30 izolacja wykonania kodu MR (w tym sposób kopiowania kodu) | ≥ 80% review z Lupy przez 2 sprinty, 0 komentarzy w złej linii na 50 |
 | 3 · AI i semantyka | briefing, hipotezy, strażnik testów, pytania; Roslyn; testy na base, pokrycie, mutacje | 24 | P3-01 izolacja `claude -p`, S4 pakowanie sidecara | precyzja ≥ 0,6 i recall ≥ 0,5 na zestawie ewaluacyjnym, akceptacja ≥ 40% |
 | 4 · Dopracowanie | emulator, tryb nauki, pętla uczenia, metryki, OAuth, audyty | 9 | — | metryki lepsze niż baza, audyty bez otwartych znalezisk |
@@ -30,7 +30,7 @@ Każda faza zostawia działające narzędzie, zgodnie z `docs/input/plan.md`. AI
 
 ```text
 P1-01 → P1-03 → P1-06 → P1-08 → P1-12 → P1-15 → P1-18a → P1-23 → bramka 1
-                                   S2 ┘          S3 ┘   S1 ┘
+                                   S2 ┘                 S1 ┘
 bramka 1 → P2-08 → P2-09 → P2-10 → P2-11 → P2-12 → P2-13 → P2-19 → P2-20 → P2-21 → P2-23 → bramka 2
                                                     P2-15 → P2-16 → P2-17 ┘
 P2-30 (ADR) → P2-31 → P2-32 → P2-33              (równolegle do trasy, P2-31 czeka na ADR)
@@ -51,13 +51,11 @@ Strumienie bez wzajemnych zależności (np. P1-17a powłoka UI i P1-06 Git, P2-3
 
 ## Stan
 
-**Warunek startu:** człowiek akceptuje ADR 0002, 0003 i 0004 (zmiana statusu na „Zaakceptowany”). Do tego czasu według kolejności źródeł z `CLAUDE.md` obowiązuje `docs/input/plan.md`, który zakłada fazę 0. Wzorce komend do `allow` w `.claude/settings.json` wpisuje człowiek na podstawie propozycji z P1-01.
-
 | Faza | Status | Uwagi |
 | --- | --- | --- |
-| 1 | do zrobienia | najpierw akceptacja ADR, potem P1-01 i spike'i S1, S2, S3 |
+| 1 | w toku | P1-01 w pracy, potem spike'i S1 i S2 |
 | 2 | do zrobienia | P2-30 może zacząć się wcześniej, bo nie zależy od kodu |
-| 3 | do zrobienia | P3-01 wymaga odpowiedzi na Q2 z `open-questions.md` |
+| 3 | do zrobienia | przed P3-01 warto potwierdzić D2 z `decisions.md` |
 | 4 | do zrobienia | — |
 
 Pojedyncze zadania odhacza się w pliku fazy, dopisując na końcu tytułu `✅ <link do zmiany>`.

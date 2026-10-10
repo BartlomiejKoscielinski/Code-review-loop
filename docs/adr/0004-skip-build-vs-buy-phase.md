@@ -1,6 +1,6 @@
 # 0004. Rezygnujemy z fazy 0 (testy gotowych rozwiązań)
 
-- Status: Proponowany
+- Status: Zaakceptowany (@Bartek, 2026-10-10, zgoda na start implementacji w sesji planowania)
 - Data: 2026-10-10
 - Decydenci: @Bartek
 
@@ -20,14 +20,14 @@
 Wybieramy opcję 2.
 
 - Plan ma cztery fazy: 1 czytnik, 2 całe review, 3 AI i semantyka, 4 dopracowanie (`docs/plan/README.md`).
-- Spike'i techniczne (S1–S3, P2-30, P3-01) wykonujemy przed zadaniami, które od nich zależą. To eksperymenty na naszym stosie, nie ocena innych produktów.
+- Spike'i techniczne (S1, S2, P2-30, P3-01, S4) wykonujemy przed zadaniami, które od nich zależą. To eksperymenty na naszym stosie, nie ocena innych produktów.
 - Metryki bazowe liczy zadanie P1-30 z API GitLaba, więc porównanie „przed i po” zostaje.
 
 ## Konsekwencje
 
 - Implementacja zaczyna się od razu od fazy 1.
 - Nie wiemy, czy gotowe narzędzie nie pokryłoby części potrzeb. Akceptujemy to ryzyko.
-- `docs/input/plan.md` nadal wspomina fazę 0 i pięć faz. Aktualizację materiału wejściowego robi człowiek (`docs/plan/open-questions.md`).
+- `docs/input/plan.md` nadal wspomina fazę 0 i pięć faz. Aktualizacja materiału wejściowego jest opcjonalna (`docs/plan/decisions.md`).
 
 ## Źródła
 

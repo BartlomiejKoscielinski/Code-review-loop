@@ -60,7 +60,7 @@
 
 #### P4-06 · OAuth z PKCE
 
-- **Zależy od:** P1-14b, odpowiedź admina GitLaba (`open-questions.md`)
+- **Zależy od:** P1-14b, rejestracja aplikacji OAuth przez admina GitLaba, jeśli będzie potrzebna (D5 w `decisions.md`)
 - **Zakres:** logowanie OAuth z PKCE jako alternatywa dla PAT, jeśli admin zarejestruje aplikację na instancji. Odświeżanie tokenu, zapis w Credential Manager, wylogowanie.
 - **Kryteria akceptacji:** testy na atrapie serwera OAuth: pełny przepływ, odświeżenie, odrzucenie złego `state`; token nie trafia do logów ani argumentów procesu.
 - **Rozmiar:** ~350 LOC.

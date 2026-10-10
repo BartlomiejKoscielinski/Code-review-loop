@@ -1,6 +1,6 @@
 # 0002. Architektura i granice modułów
 
-- Status: Proponowany
+- Status: Zaakceptowany (@Bartek, 2026-10-10, zgoda na start implementacji w sesji planowania)
 - Data: 2026-10-10
 - Decydenci: @Bartek
 

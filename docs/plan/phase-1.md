@@ -8,15 +8,13 @@
 
 ## Spike'i na start fazy
 
-Spike'i nie są fazą 0. To krótkie eksperymenty, które Claude wykonuje przed zadaniami zależnymi od ich wyniku. Zasady są w `spikes/README.md`, zakłada je `/spike start`.
+Spike'i nie są fazą 0. To krótkie eksperymenty, które Claude wykonuje sam przed zadaniami zależnymi od ich wyniku (zasady w `spikes/README.md`).
 
 | ID | Nazwa | Pytanie | Kryterium sukcesu | Limit | Odblokowuje |
 | --- | --- | --- | --- | --- | --- |
 | S1 | `codemirror-merge-external-diff` | Czy `@codemirror/merge` przyjmie hunki policzone w Ruście, czy budujemy widok z dwóch `EditorView` i własnych dekoracji? Ile fps daje plik 10 000 linii w WebView2? Jak mierzyć prawdziwą aplikację Tauri na Windows (start do pierwszego ekranu, fps w WebView2), skoro Playwright na buildzie Vite tego nie obejmuje? Narzędzia pomiaru są **NIEZWERYFIKOWANE** i ustala je spike. | widok obok siebie z hunkami z zewnątrz pokazuje te same linie co `git diff --histogram`; przewijanie ≥ 55 fps p95 na maszynie referencyjnej; powtarzalny pomiar startu aplikacji (rozrzut < 10% w 5 przebiegach) | 8 h | ADR widoku diffa, P1-18a, P1-28 |
 | S2 | `gix-diff-parity` | Czy `gix` z `imara-diff` (histogram) daje hunki identyczne z `git diff --histogram` i jak szybko liczy największy MR z repo MAUI? Czy `gix` obsługuje status working tree z `core.autocrlf`, `.gitattributes` i filtrami (np. LFS) zgodnie z `git status`? | 100% zgodności na 200 losowych parach plików; lista plików największego MR z ostatnich 6 miesięcy < 150 ms z ciepłego cache; status working tree zgodny z `git status --porcelain` na 5 przypadkach z CRLF i LFS, a jeśli nie, decyzja o `git` CLI dla working tree | 8 h | ADR biblioteki Git, P1-06, P1-08 |
-| S3 | `gitlab-instance-capabilities` | Jaka jest wersja instancji GitLaba zespołu i które z endpointów z `docs/input/plan.md` działają? Progi z kodu GitLaba (`fact-checker`, 2026-10-10): `draft_notes` z `position` od 16.3, `bulk_publish` od 15.11, a z notatką i `reviewer_state` od 19.2, `scope=reviews_for_me` od 18.4. | tabela endpoint → działa / nie działa / od wersji, z wynikiem wywołań na instancji | 3 h | P1-14b, zakres fazy 2 |
 
-S3 wymaga tokenu do instancji zespołu, więc uruchamia go człowiek albo Claude na maszynie dewelopera z tokenem w zmiennej środowiskowej. Token nie trafia do plików spike'a.
 
 ## Kamienie milowe
 
@@ -48,7 +46,7 @@ Format każdego zadania: zależności, zakres, kryteria akceptacji (co uruchomi�
 #### P1-02 · CI na Windows
 
 - **Zależy od:** P1-01
-- **Zakres:** repo Lupy jest na GitHubie (`README.md`, „Mapa repo”), więc workflow GitHub Actions na hostowanym runnerze Windows (jeśli zespół przeniesie repo, zadanie zmienia platformę, patrz Q9 w `open-questions.md`): format, clippy, testy Rust, lint, typecheck, testy TS, testy hooków. Cache zależności. Bez sekretów.
+- **Zakres:** repo Lupy jest na GitHubie (`README.md`, „Mapa repo”), więc workflow GitHub Actions na hostowanym runnerze Windows (D8 w `decisions.md`): format, clippy, testy Rust, lint, typecheck, testy TS, testy hooków. Cache zależności. Bez sekretów.
 - **Kryteria akceptacji:** workflow przechodzi na PR z tej zmiany; celowo zepsuty test (w osobnym commicie testowym, potem cofniętym) daje czerwony status.
 - **Rozmiar:** ~120 LOC.
 
@@ -144,7 +142,7 @@ Format każdego zadania: zależności, zakres, kryteria akceptacji (co uruchomi�
 #### P1-14a · Token GitLaba
 
 - **Zależy od:** P1-03
-- **Zakres:** `lupa-secrets`: token w Windows Credential Manager, ekran ustawień do wklejenia, sprawdzenia i usunięcia tokenu, typ `Secret` bez `Debug` i `Display` z treścią. Zakres tokenu według Q8 z `open-questions.md`.
+- **Zakres:** `lupa-secrets`: token w Windows Credential Manager, ekran ustawień do wklejenia, sprawdzenia i usunięcia tokenu, typ `Secret` bez `Debug` i `Display` z treścią. Zakres tokenu według D5 w `decisions.md`.
 - **Kryteria akceptacji:**
   - test: token nie występuje w `Debug`, `Display`, logach ani w `IpcError` (przeszukanie wyjścia testu);
   - token nigdy nie trafia do argumentów procesu ani do pliku (test na atrapie magazynu);
@@ -154,10 +152,10 @@ Format każdego zadania: zależności, zakres, kryteria akceptacji (co uruchomi�
 
 #### P1-14b · Klient GitLaba (odczyt)
 
-- **Zależy od:** P1-14a, S3
+- **Zależy od:** P1-14a
 - **Zakres:** `lupa-gitlab`:
   - konfigurowalny URL instancji, TLS z weryfikacją (opcja dodania firmowego CA, bez wyłączania weryfikacji);
-  - wersja instancji z `GET /api/v4/version` ([Metadata API](https://docs.gitlab.com/api/metadata/)) i mapa możliwości z wyniku S3;
+  - wersja instancji z `GET /api/v4/version` ([Metadata API](https://docs.gitlab.com/api/metadata/)) i mapa możliwości: progi wersji z kodu GitLaba (`fact-checker`, 2026-10-10): `draft_notes` z `position` od 16.3, `bulk_publish` od 15.11, a z notatką i `reviewer_state` od 19.2, `scope=reviews_for_me` od 18.4 (decyzja D1 w `decisions.md`);
   - `GET` MR, `diff_refs`, wersje MR, dyskusje, stronicowanie, limity zapytań i ponowienia;
   - redakcja tokenu w błędach.
 - **Kryteria akceptacji:** testy na atrapie HTTP: stronicowanie, 401 z czytelnym komunikatem bez tokenu, 429 z ponowieniem, wyłączenie funkcji przy starszej wersji instancji, odrzucenie certyfikatu spoza zaufanych CA.
@@ -309,7 +307,7 @@ Układ ekranu „Otwórz”: po lewej cztery zakładki źródeł (`1`–`4`), w 
 #### P1-30 · Metryki bazowe zespołu
 
 - **Zależy od:** P1-14b
-- **Zakres:** komenda w ustawieniach „Policz metryki bazowe” dla projektu, z ostatnich 3 miesięcy, z API GitLaba: mediana czasu do pierwszego review, liczba rund na MR, mediana rozmiaru MR i liczba błędów po merge (issues z etykietą ustawioną w konfiguracji, powiązane z MR; jeśli zespół nie prowadzi błędów w GitLabie, metryka zostaje pusta z adnotacją, patrz Q10). Wynik zapisany lokalnie i eksportowany do Markdown. Zastępuje pomiar bazy z fazy 0 z `docs/input/plan.md`.
+- **Zakres:** komenda w ustawieniach „Policz metryki bazowe” dla projektu, z ostatnich 3 miesięcy, z API GitLaba: mediana czasu do pierwszego review, liczba rund na MR, mediana rozmiaru MR i liczba błędów po merge (issues z etykietą ustawioną w konfiguracji, powiązane z MR; jeśli zespół nie prowadzi błędów w GitLabie, metryka zostaje pusta z adnotacją, D9 w `decisions.md`). Wynik zapisany lokalnie i eksportowany do Markdown. Zastępuje pomiar bazy z fazy 0 z `docs/input/plan.md`.
 - **Kryteria akceptacji:** testy na atrapie API z ustalonym zestawem MR dają znane wartości median; eksport nie zawiera tytułów ani treści MR, tylko liczby i daty.
 - **Rozmiar:** ~250 LOC.
 

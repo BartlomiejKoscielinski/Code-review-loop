@@ -4,7 +4,7 @@
 
 **Poza zakresem:** AI (miejsca na treści AI w makietach pokazują wyniki deterministyczne albo są ukryte), Roslyn, testy na base, pokrycie, mutacje.
 
-**Zależność od wyniku S3:** jeśli instancja nie obsługuje `reviewer_state` w `bulk_publish` albo wersji MR, odpowiednie zadania mają wariant zastępczy opisany w zadaniu, a bramka fazy odnotowuje ograniczenie.
+**Zależność od wersji GitLaba (D1):** jeśli instancja wykryta przez P1-14b nie obsługuje `reviewer_state` w `bulk_publish` albo wersji MR, odpowiednie zadania mają wariant zastępczy opisany w zadaniu, a bramka fazy odnotowuje ograniczenie.
 
 ## Kamienie milowe
 
@@ -217,7 +217,7 @@
 #### P2-18 · Odpowiedzi i rozwiązywanie wątków
 
 - **Zależy od:** P2-17, P1-26
-- **Zakres:** „Odpowiedz” (`r`) i „Rozwiąż wątek” (`e`) na istniejących wątkach GitLaba (skróty z makiet `Main` i `Interdiff`). Odpowiedź jako draft, publikowana razem z review. Rozwiązanie wątku przez parametr draftu albo osobne wywołanie, według dokumentacji i wyniku S3 (fakt **NIEZWERYFIKOWANY**, sprawdza `fact-checker` przed zadaniem).
+- **Zakres:** „Odpowiedz” (`r`) i „Rozwiąż wątek” (`e`) na istniejących wątkach GitLaba (skróty z makiet `Main` i `Interdiff`). Odpowiedź jako draft, publikowana razem z review. Rozwiązanie wątku przez parametr draftu albo osobne wywołanie, według dokumentacji i wersji instancji (fakt **NIEZWERYFIKOWANY**, sprawdza `fact-checker` przed zadaniem).
 - **Kryteria akceptacji:** wynik weryfikacji mechanizmu rozwiązania wątku (`fact-checker`) z linkiem w opisie zmiany przed kodem; testy na atrapie API dla odpowiedzi i rozwiązania według tego wyniku; skróty `r` i `e` działają na wątku z fokusem; stan „Wątek rozwiązany, opublikuje się razem z review” z cofnięciem, jak w makiecie `Interdiff`.
 - **Rozmiar:** ~250 LOC.
 
@@ -401,7 +401,7 @@ Różnica ostrzeżeń wymaga buildu base i head, czyli wykonania kodu z repozyto
 
 #### P2-34 · Auto-update
 
-- **Zależy od:** P1-29, odpowiedź na pytanie o kanał dystrybucji (`open-questions.md`)
+- **Zależy od:** P1-29, kanał dystrybucji wybrany w zadaniu (D4 w `decisions.md`)
 - **Zakres:** updater Tauri z wewnętrznego kanału, podpisane aktualizacje, sprawdzanie w tle i instalacja po potwierdzeniu użytkownika. Klucz podpisu poza repo (zmienna środowiskowa w CI).
 - **Kryteria akceptacji:** aktualizacja z wersji N do N+1 na Windows z kanału testowego (zapis kroków i wyniku w opisie zmiany); aktualizacja z błędnym podpisem jest odrzucona.
 - **Rozmiar:** ~200 LOC.

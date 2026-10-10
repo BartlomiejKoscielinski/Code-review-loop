@@ -61,10 +61,10 @@ Sprawdzone przez `fact-checker` 2026-10-10 w dokumentacji Claude Code ([CLI refe
 - **Kryteria akceptacji:**
   - spike zamknięty z logami: żaden wrogi element się nie wykonał ani nie wczytał (sprawdzenie plików-pułapek i transkryptu `stream-json`), a próba użycia `Bash`, `Edit` i `WebFetch` kończy się odmową;
   - próba `Read` poza migawką (repo dewelopera, `%USERPROFILE%`, baza Lupy) kończy się odmową;
-  - kryterium twarde: z poziomu użytkownika nie ładuje się żaden hook, plugin, skill, subagent ani serwer MCP. Jeśli flagi tego nie zapewniają, ADR opisuje wykrywanie takiej konfiguracji i odmowę startu sesji AI z komunikatem (pytanie Q11 w `open-questions.md`);
+  - kryterium twarde: z poziomu użytkownika nie ładuje się żaden hook, plugin, skill, subagent ani serwer MCP. Jeśli flagi tego nie zapewniają, ADR opisuje wykrywanie takiej konfiguracji i odmowę startu sesji AI z komunikatem (D10 w `decisions.md`);
   - ADR ustala sposób uruchamiania `claude` bez `cmd.exe`;
   - ADR „Proponowany” z przeglądem `security-reviewer`, zaakceptowany przez człowieka przed P3-02;
-  - potwierdzenie admina Claude Enterprise, że użycie seatów przez narzędzie wewnętrzne jest zgodne z umową, i ustalenie retencji danych (pytania z `open-questions.md`); wynik zapisany w ADR.
+  - potwierdzenie admina Claude Enterprise, że użycie seatów przez narzędzie wewnętrzne jest zgodne z umową, i ustalenie retencji danych (D2 w `decisions.md`); wynik zapisany w ADR.
 - **Rozmiar:** spike + ADR. Limit spike'a: 8 h.
 - **Przegląd:** security.
 
@@ -137,7 +137,7 @@ Sprawdzone przez `fact-checker` 2026-10-10 w dokumentacji Claude Code ([CLI refe
   - czas życia w DI;
   - uprawnienia Android.
 
-  Właściciel: patrz Q12.
+  Źródło przypadków: commity naprawiające błędy z historii repo MAUI (D11 w `decisions.md`).
 - **Kryteria akceptacji:** `lupa-eval` przechodzi na zestawie bez błędów formatu; raport bazowy (precyzja, recall) dla domyślnych promptów zapisany w repo MAUI; każdy przypadek ma opis błędu i linie.
 - **Rozmiar:** dane testowe w repo MAUI, poza limitem LOC kodu.
 
@@ -308,7 +308,7 @@ Wszystkie zadania tego kamienia uruchamiają kod z MR, więc działają w strefi
 
 ## Bramka wyjścia z fazy 3
 
-Progi to propozycja planu. Zespół zatwierdza je przed startem fazy (pytanie w `open-questions.md`).
+Progi to propozycja planu. Korygujemy je po pierwszym pomiarze (D6 w `decisions.md`).
 
 1. Zestaw ewaluacyjny z P3-22 (20 MR z kodu MAUI z wstawionymi błędami): precyzja hipotez ≥ 0,6 i recall ≥ 0,5 przy domyślnym progu pewności.
 2. Przez 2 sprinty odsetek zaakceptowanych hipotez ≥ 40%, a najczęstszy powód odrzucenia ma plan poprawki w `.review/`.
