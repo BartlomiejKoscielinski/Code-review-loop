@@ -80,7 +80,7 @@ Format każdego zadania: zależności, zakres, kryteria akceptacji (co uruchomi�
 
 ### 1.1 Git i diff
 
-#### P1-06 · Odczyt repozytorium
+#### P1-06 · Odczyt repozytorium ✅
 
 - **Zależy od:** P1-01, S2
 - **Zakres:** `lupa-git` na `gix` (wynik S2, `git2` niepotrzebny): rozwiązywanie refów i SHA, `merge-base`, lista zmienionych plików między dwoma drzewami z wykrywaniem zmian nazw, odczyt blobów. `lupa-testkit`: budowanie repozytoriów testowych przez `git` CLI w katalogu tymczasowym.

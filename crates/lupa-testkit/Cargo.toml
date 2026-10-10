@@ -1,0 +1,11 @@
+[package]
+name = "lupa-testkit"
+version = "0.1.0"
+description = "Test helpers for Lupa: throwaway Git repositories"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+tempfile = "3"
