@@ -1,0 +1,3 @@
+# ts-rs writes TypeScript types for IPC into packages/ipc on every `cargo test`.
+[env]
+TS_RS_EXPORT_DIR = { value = "packages/ipc/src/generated", relative = true }

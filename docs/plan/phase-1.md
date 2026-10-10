@@ -50,10 +50,10 @@ Format każdego zadania: zależności, zakres, kryteria akceptacji (co uruchomi�
 - **Kryteria akceptacji:** workflow przechodzi na PR z tej zmiany i buduje instalator NSIS (`npm run app:build`), co zamyka ostatnie kryterium P1-01; celowo zepsuty test (w osobnym commicie testowym, potem cofniętym) daje czerwony status.
 - **Rozmiar:** ~120 LOC.
 
-#### P1-03 · Kontrakt IPC
+#### P1-03 · Kontrakt IPC ✅
 
 - **Zależy od:** P1-01
-- **Zakres:** wzorzec komendy Tauri z `Result<T, IpcError>`, zdarzenia postępu, anulowanie zadania. Generowanie typów do `packages/ipc` (wybór między `tauri-specta` a `ts-rs` w opisie zmiany). Walidacja odpowiedzi w UI (`zod`). Skrypt `npm run check:ipc`, który failuje, gdy typy są nieaktualne, dodany do CI. Przykładowa komenda `app_info`.
+- **Zakres:** wzorzec komendy Tauri z `Result<T, IpcError>`. Zdarzenia postępu i anulowanie przeniesione do P1-15, pierwszej długiej operacji, bo wymagają uprawnienia do zdarzeń w capability. Generowanie typów do `packages/ipc` (wybór między `tauri-specta` a `ts-rs` w opisie zmiany). Walidacja odpowiedzi w UI (`zod`). Skrypt `npm run check:ipc`, który failuje, gdy typy są nieaktualne, dodany do CI. Przykładowa komenda `app_info`.
 - **Kryteria akceptacji:**
   - zmiana pola w Rust bez regeneracji typów daje błąd `npm run check:ipc`;
   - test Rust: `IpcError` z błędu zawierającego token (wzorzec `glpat-`) nie zawiera tokenu po serializacji;
@@ -142,7 +142,7 @@ Format każdego zadania: zależności, zakres, kryteria akceptacji (co uruchomi�
 #### P1-14a · Token GitLaba
 
 - **Zależy od:** P1-03
-- **Zakres:** `lupa-secrets`: token w Windows Credential Manager, ekran ustawień do wklejenia, sprawdzenia i usunięcia tokenu, typ `Secret` bez `Debug` i `Display` z treścią. Zakres tokenu według D5 w `decisions.md`.
+- **Zakres:** `lupa-secrets`: token w Windows Credential Manager, ekran ustawień do wklejenia, sprawdzenia i usunięcia tokenu, typ `Secret` bez `Debug` i `Display` z treścią. `IpcError` dodatkowo wycina dokładną wartość zapisanego tokenu (prefiksy instancji mogą być własne, a stare tokeny nie mają prefiksu). Zakres tokenu według D5 w `decisions.md`.
 - **Kryteria akceptacji:**
   - test: token nie występuje w `Debug`, `Display`, logach ani w `IpcError` (przeszukanie wyjścia testu);
   - token nigdy nie trafia do argumentów procesu ani do pliku (test na atrapie magazynu);
@@ -165,9 +165,10 @@ Format każdego zadania: zależności, zakres, kryteria akceptacji (co uruchomi�
 #### P1-15 · Cel review: merge request
 
 - **Zależy od:** P1-12, P1-14b
-- **Zakres:** pobranie `refs/merge-requests/<iid>/head` ([GitLab: MR troubleshooting](https://docs.gitlab.com/user/project/merge_requests/merge_request_troubleshooting/)) przez `git fetch` w tle (uwierzytelnienie z istniejącej konfiguracji Gita dewelopera, bez tokenu Lupy w argumentach i środowisku). Cel MR z `diff_refs` (`base_sha`, `start_sha`, `head_sha`). `diff_refs` wypełnia się asynchronicznie po utworzeniu MR, więc pusty wynik oznacza „liczy się”, a nie błąd. GitLab usuwa ref `head` 14 dni po zamknięciu lub merge'u MR. Wtedy Lupa próbuje pobrać commity po SHA z `diff_refs`, a gdy się nie da, pokazuje komunikat. Test zgodności z listą zmian MR z API.
+- **Zakres:** wzorzec zadań w tle przeniesiony z P1-03: identyfikator zadania, zdarzenia postępu, komenda anulowania, z minimalnym uprawnieniem do zdarzeń w capability (przegląd security). Pobranie `refs/merge-requests/<iid>/head` ([GitLab: MR troubleshooting](https://docs.gitlab.com/user/project/merge_requests/merge_request_troubleshooting/)) przez `git fetch` w tle (uwierzytelnienie z istniejącej konfiguracji Gita dewelopera, bez tokenu Lupy w argumentach i środowisku). Cel MR z `diff_refs` (`base_sha`, `start_sha`, `head_sha`). `diff_refs` wypełnia się asynchronicznie po utworzeniu MR, więc pusty wynik oznacza „liczy się”, a nie błąd. GitLab usuwa ref `head` 14 dni po zamknięciu lub merge'u MR. Wtedy Lupa próbuje pobrać commity po SHA z `diff_refs`, a gdy się nie da, pokazuje komunikat. Test zgodności z listą zmian MR z API.
 - **Kryteria akceptacji:**
   - test na atrapie: cel MR używa SHA z `diff_refs`, nie z bieżącej gałęzi docelowej;
+  - test: fetch w tle wysyła zdarzenia postępu, a anulowanie kończy proces `git` i zwraca błąd z kodem `cancelled`;
   - test: `iid` i nazwy gałęzi z API są walidowane, zanim trafią do argumentów `git` (odrzucenie wartości zaczynających się od `-` i zawierających `..`);
   - test na atrapie: pusty `diff_refs` daje stan „liczy się” i ponowienie;
   - ręczna weryfikacja na 20 ostatnich MR z repo MAUI (otwartych albo zmergowanych w ciągu 14 dni): lista plików i liczby `+`/`−` zgodne z GitLabem, wynik w opisie zmiany.

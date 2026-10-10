@@ -55,6 +55,9 @@ jobs:
       - name: Rust tests
         run: cargo test --workspace
 
+      - name: IPC types up to date
+        run: npm run check:ipc
+
       - name: Claude Code hook tests
         run: node --test .claude/hooks/hooks.test.mjs
 

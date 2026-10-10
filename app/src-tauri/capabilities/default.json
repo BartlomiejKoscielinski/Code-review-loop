@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Main window. No permissions yet: each IPC task adds only what it needs (P1-03).",
+  "description": "Main window: only the app commands it needs. No plugin or core permissions.",
   "windows": ["main"],
-  "permissions": []
+  "permissions": ["allow-app-info"]
 }

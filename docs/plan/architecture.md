@@ -83,9 +83,10 @@ Wszystko, co da się policzyć z obiektów Gita, jest kluczowane identyfikatorem
 
 ## IPC
 
-- Komendy Tauri zwracają `Result<T, IpcError>`. `IpcError` ma kod, komunikat dla człowieka i kontekst bez sekretów (reguła `.claude/rules/rust.md`).
+- Komendy Tauri zwracają `Result<T, IpcError>`. `IpcError` ma kod i komunikat z kontekstem (co, na jakim pliku lub MR), z którego konstruktor usuwa wartości wyglądające na tokeny (reguła `.claude/rules/rust.md`).
+- Każda komenda jest na liście w `app/src-tauri/build.rs` (generuje uprawnienie `allow-<komenda>`) i w capability okna. Test pilnuje, że capability daje tylko uprawnienia komend aplikacji.
 - Typy TypeScript w `packages/ipc` są generowane z Rusta. Narzędzie wybiera zadanie P1-03. CI sprawdza, że wygenerowane typy są aktualne.
-- Długie operacje mają identyfikator zadania, zdarzenia postępu i komendę anulowania.
+- Długie operacje mają identyfikator zadania, zdarzenia postępu i komendę anulowania (od P1-15).
 - UI waliduje odpowiedzi na granicy (reguła `.claude/rules/typescript.md`).
 
 ## Zależności (kandydaci)

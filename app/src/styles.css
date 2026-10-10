@@ -30,3 +30,7 @@ body {
 .start p {
   color: var(--muted);
 }
+
+.start .version {
+  font-size: 12px;
+}

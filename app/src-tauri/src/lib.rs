@@ -1,6 +1,11 @@
+pub mod commands;
+pub mod ipc;
+
 /// Starts the Lupa window and blocks until it is closed.
 pub fn run() -> tauri::Result<()> {
-    tauri::Builder::default().run(tauri::generate_context!())
+    tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![commands::app_info])
+        .run(tauri::generate_context!())
 }
 
 #[cfg(test)]
@@ -70,5 +75,31 @@ mod tests {
             "Tauri must keep adding CSP nonces and hashes to assets"
         );
         assert_ne!(security["assetProtocol"]["enable"], Value::Bool(true));
+    }
+
+    #[test]
+    fn capabilities_grant_only_app_commands_to_the_main_window() {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/capabilities");
+        let mut checked = 0;
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            let text = std::fs::read_to_string(&path).unwrap();
+            let capability: Value = serde_json::from_str(&text).unwrap();
+            let file = path.display();
+            assert!(
+                capability.get("remote").is_none(),
+                "{file} exposes IPC to remote URLs"
+            );
+            assert_eq!(capability["windows"], serde_json::json!(["main"]), "{file}");
+            for permission in capability["permissions"].as_array().unwrap() {
+                let name = permission.as_str().unwrap();
+                assert!(
+                    name.starts_with("allow-") && !name.contains(':'),
+                    "{file}: permission {name} is not an app command permission"
+                );
+            }
+            checked += 1;
+        }
+        assert!(checked > 0, "no capability files in {dir}");
     }
 }

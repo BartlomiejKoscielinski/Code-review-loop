@@ -5,7 +5,8 @@
     "node": ">=22.13"
   },
   "workspaces": [
-    "app"
+    "app",
+    "packages/*"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
@@ -15,7 +16,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "app:dev": "npm run app:dev -w app --",
-    "app:build": "npm run app:build -w app --"
+    "app:build": "npm run app:build -w app --",
+    "check:ipc": "node scripts/check-ipc.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

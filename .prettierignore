@@ -7,3 +7,4 @@ package-lock.json
 app/src-tauri/gen/
 app/src-tauri/icons/
 *.md
+packages/ipc/src/generated/
