@@ -12,9 +12,9 @@ Spike'i nie są fazą 0. To krótkie eksperymenty, które Claude wykonuje przed 
 
 | ID | Nazwa | Pytanie | Kryterium sukcesu | Limit | Odblokowuje |
 | --- | --- | --- | --- | --- | --- |
-| S1 | `codemirror-merge-external-diff` | Czy `@codemirror/merge` przyjmie hunki policzone w Ruście, czy budujemy widok z dwóch `EditorView` i własnych dekoracji? Ile fps daje plik 10 000 linii w WebView2? | widok obok siebie z hunkami z zewnątrz pokazuje te same linie co `git diff --histogram`; przewijanie ≥ 55 fps p95 na maszynie referencyjnej | 6 h | ADR widoku diffa, P1-18 |
-| S2 | `gix-diff-parity` | Czy `gix` z `imara-diff` (histogram) daje hunki identyczne z `git diff --histogram` i jak szybko liczy największy MR z repo MAUI? | 100% zgodności na 200 losowych parach plików; lista plików największego MR z ostatnich 6 miesięcy < 150 ms z ciepłego cache | 6 h | ADR biblioteki Git, P1-06, P1-08 |
-| S3 | `gitlab-instance-capabilities` | Jaka jest wersja instancji GitLaba zespołu i które z endpointów z `docs/input/plan.md` działają? Progi z kodu GitLaba (`fact-checker`, 2026-10-10): `draft_notes` z `position` od 16.3, `bulk_publish` od 15.11, a z notatką i `reviewer_state` od 19.2, `scope=reviews_for_me` od 18.4. | tabela endpoint → działa / nie działa / od wersji, z wynikiem wywołań na instancji | 3 h | P1-14, zakres fazy 2 |
+| S1 | `codemirror-merge-external-diff` | Czy `@codemirror/merge` przyjmie hunki policzone w Ruście, czy budujemy widok z dwóch `EditorView` i własnych dekoracji? Ile fps daje plik 10 000 linii w WebView2? Jak mierzyć prawdziwą aplikację Tauri na Windows (start do pierwszego ekranu, fps w WebView2), skoro Playwright na buildzie Vite tego nie obejmuje? Narzędzia pomiaru są **NIEZWERYFIKOWANE** i ustala je spike. | widok obok siebie z hunkami z zewnątrz pokazuje te same linie co `git diff --histogram`; przewijanie ≥ 55 fps p95 na maszynie referencyjnej; powtarzalny pomiar startu aplikacji (rozrzut < 10% w 5 przebiegach) | 8 h | ADR widoku diffa, P1-18a, P1-28 |
+| S2 | `gix-diff-parity` | Czy `gix` z `imara-diff` (histogram) daje hunki identyczne z `git diff --histogram` i jak szybko liczy największy MR z repo MAUI? Czy `gix` obsługuje status working tree z `core.autocrlf`, `.gitattributes` i filtrami (np. LFS) zgodnie z `git status`? | 100% zgodności na 200 losowych parach plików; lista plików największego MR z ostatnich 6 miesięcy < 150 ms z ciepłego cache; status working tree zgodny z `git status --porcelain` na 5 przypadkach z CRLF i LFS, a jeśli nie, decyzja o `git` CLI dla working tree | 8 h | ADR biblioteki Git, P1-06, P1-08 |
+| S3 | `gitlab-instance-capabilities` | Jaka jest wersja instancji GitLaba zespołu i które z endpointów z `docs/input/plan.md` działają? Progi z kodu GitLaba (`fact-checker`, 2026-10-10): `draft_notes` z `position` od 16.3, `bulk_publish` od 15.11, a z notatką i `reviewer_state` od 19.2, `scope=reviews_for_me` od 18.4. | tabela endpoint → działa / nie działa / od wersji, z wynikiem wywołań na instancji | 3 h | P1-14b, zakres fazy 2 |
 
 S3 wymaga tokenu do instancji zespołu, więc uruchamia go człowiek albo Claude na maszynie dewelopera z tokenem w zmiennej środowiskowej. Token nie trafia do plików spike'a.
 
@@ -25,7 +25,7 @@ S3 wymaga tokenu do instancji zespołu, więc uruchamia go człowiek albo Claude
 | 1.0 Fundament | P1-01 … P1-05 | puste okno, CI, IPC, SQLite, lista repozytoriów |
 | 1.1 Git i diff | P1-06 … P1-11 | diff dowolnej pary commitów i working tree w rdzeniu |
 | 1.2 Źródła | P1-12 … P1-16 | cztery cele review otwierane z ekranu „Otwórz” |
-| 1.3 Widok | P1-17 … P1-27 | pełny czytnik z klawiaturą, viewed, wątkami GitLaba |
+| 1.3 Widok | P1-17a … P1-27 | pełny czytnik z klawiaturą, viewed, wątkami GitLaba |
 | 1.4 Wydanie | P1-28 … P1-30 | budżety zmierzone, instalator, metryki bazowe |
 
 ## Zadania
@@ -37,10 +37,10 @@ Format każdego zadania: zależności, zakres, kryteria akceptacji (co uruchomi�
 #### P1-01 · Szkielet monorepo i aplikacji Tauri
 
 - **Zależy od:** —
-- **Zakres:** Cargo workspace z `app/src-tauri` i pustym `crates/lupa-testkit`. npm workspaces z `app` i `packages/domain`, Vite + React + TypeScript `strict`, ESLint, Prettier, Vitest. Okno Tauri 2 z ekranem „Lupa” i restrykcyjnym CSP. Komendy z `architecture.md` w `package.json` i w sekcji „Komendy” w `CLAUDE.md`. Nowe wzorce w `allow` w `.claude/settings.json`.
+- **Zakres:** Cargo workspace z `app/src-tauri` i pustym `crates/lupa-testkit`. npm workspaces z `app` i `packages/domain`, Vite + React + TypeScript `strict`, ESLint, Prettier, Vitest. Okno Tauri 2 z ekranem „Lupa” i restrykcyjnym CSP. Komendy z `architecture.md` w `package.json` i w sekcji „Komendy” w `CLAUDE.md`. Propozycja wzorców do `allow` w opisie zmiany. Wpisuje je człowiek, agent nie zmienia własnych uprawnień.
 - **Kryteria akceptacji:**
   - `cargo build --workspace`, `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `npm run build`, `npm test`, `npm run lint`, `npm run typecheck` kończą się kodem 0;
-  - `npm run tauri build` na Windows tworzy instalator, a aplikacja po instalacji pokazuje ekran „Lupa”;
+  - `npm run app:build` na Windows tworzy instalator, a aplikacja po instalacji pokazuje ekran „Lupa”;
   - jeden test smoke w każdym ekosystemie, który failuje po usunięciu testowanego elementu;
   - `node --test .claude/hooks/hooks.test.mjs` nadal przechodzi.
 - **Rozmiar:** ~350 LOC, głównie konfiguracja.
@@ -48,7 +48,7 @@ Format każdego zadania: zależności, zakres, kryteria akceptacji (co uruchomi�
 #### P1-02 · CI na Windows
 
 - **Zależy od:** P1-01
-- **Zakres:** workflow GitHub Actions na runnerze Windows: format, clippy, testy Rust, lint, typecheck, testy TS, testy hooków. Cache zależności. Bez sekretów.
+- **Zakres:** repo Lupy jest na GitHubie (`README.md`, „Mapa repo”), więc workflow GitHub Actions na hostowanym runnerze Windows (jeśli zespół przeniesie repo, zadanie zmienia platformę, patrz Q9 w `open-questions.md`): format, clippy, testy Rust, lint, typecheck, testy TS, testy hooków. Cache zależności. Bez sekretów.
 - **Kryteria akceptacji:** workflow przechodzi na PR z tej zmiany; celowo zepsuty test (w osobnym commicie testowym, potem cofniętym) daje czerwony status.
 - **Rozmiar:** ~120 LOC.
 
@@ -141,23 +141,32 @@ Format każdego zadania: zależności, zakres, kryteria akceptacji (co uruchomi�
 - **Kryteria akceptacji:** testy obu trybów; po edycji pliku i odświeżeniu „viewed” znika tylko z tego pliku; odświeżenie repo z 5 000 plików bez zmian trwa < 300 ms (pomiar w teście integracyjnym na repo z `lupa-testkit`).
 - **Rozmiar:** ~250 LOC.
 
-#### P1-14 · Klient GitLaba (odczyt) i token
+#### P1-14a · Token GitLaba
 
-- **Zależy od:** P1-03, S3
-- **Zakres:**
-  - `lupa-secrets`: token w Windows Credential Manager, ekran ustawień do wklejenia i usunięcia tokenu;
-  - `lupa-gitlab`: konfigurowalny URL instancji, TLS z weryfikacją (opcja dodania firmowego CA, bez wyłączania weryfikacji), wersja instancji i mapa możliwości z wyniku S3, `GET` MR, `diff_refs`, wersje MR, dyskusje, stronicowanie, limity zapytań i ponowienia;
-  - redakcja tokenu w błędach i logach.
+- **Zależy od:** P1-03
+- **Zakres:** `lupa-secrets`: token w Windows Credential Manager, ekran ustawień do wklejenia, sprawdzenia i usunięcia tokenu, typ `Secret` bez `Debug` i `Display` z treścią. Zakres tokenu według Q8 z `open-questions.md`.
 - **Kryteria akceptacji:**
-  - testy na atrapie HTTP: stronicowanie, 401 z czytelnym komunikatem bez tokenu, 429 z ponowieniem, wyłączenie funkcji przy starszej wersji instancji;
   - test: token nie występuje w `Debug`, `Display`, logach ani w `IpcError` (przeszukanie wyjścia testu);
-  - token nigdy nie trafia do argumentów procesu ani do pliku (test na atrapie magazynu).
-- **Rozmiar:** ~400 LOC. Jeśli przekroczy limit, dzielimy na `lupa-secrets` + ustawienia i `lupa-gitlab`.
+  - token nigdy nie trafia do argumentów procesu ani do pliku (test na atrapie magazynu);
+  - usunięcie tokenu w ustawieniach usuwa wpis z magazynu.
+- **Rozmiar:** ~200 LOC.
+- **Przegląd:** security.
+
+#### P1-14b · Klient GitLaba (odczyt)
+
+- **Zależy od:** P1-14a, S3
+- **Zakres:** `lupa-gitlab`:
+  - konfigurowalny URL instancji, TLS z weryfikacją (opcja dodania firmowego CA, bez wyłączania weryfikacji);
+  - wersja instancji z `GET /api/v4/version` ([Metadata API](https://docs.gitlab.com/api/metadata/)) i mapa możliwości z wyniku S3;
+  - `GET` MR, `diff_refs`, wersje MR, dyskusje, stronicowanie, limity zapytań i ponowienia;
+  - redakcja tokenu w błędach.
+- **Kryteria akceptacji:** testy na atrapie HTTP: stronicowanie, 401 z czytelnym komunikatem bez tokenu, 429 z ponowieniem, wyłączenie funkcji przy starszej wersji instancji, odrzucenie certyfikatu spoza zaufanych CA.
+- **Rozmiar:** ~300 LOC.
 - **Przegląd:** security.
 
 #### P1-15 · Cel review: merge request
 
-- **Zależy od:** P1-12, P1-14
+- **Zależy od:** P1-12, P1-14b
 - **Zakres:** pobranie `refs/merge-requests/<iid>/head` ([GitLab: MR troubleshooting](https://docs.gitlab.com/user/project/merge_requests/merge_request_troubleshooting/)) przez `git fetch` w tle (uwierzytelnienie z istniejącej konfiguracji Gita dewelopera, bez tokenu Lupy w argumentach i środowisku). Cel MR z `diff_refs` (`base_sha`, `start_sha`, `head_sha`). `diff_refs` wypełnia się asynchronicznie po utworzeniu MR, więc pusty wynik oznacza „liczy się”, a nie błąd. GitLab usuwa ref `head` 14 dni po zamknięciu lub merge'u MR. Wtedy Lupa próbuje pobrać commity po SHA z `diff_refs`, a gdy się nie da, pokazuje komunikat. Test zgodności z listą zmian MR z API.
 - **Kryteria akceptacji:**
   - test na atrapie: cel MR używa SHA z `diff_refs`, nie z bieżącej gałęzi docelowej;
@@ -184,37 +193,51 @@ Układ ekranu „Otwórz”: po lewej cztery zakładki źródeł (`1`–`4`), w 
 
 ### 1.3 Widok
 
-#### P1-17 · Powłoka UI i motywy
+#### P1-17a · Powłoka UI
 
 - **Zależy od:** P1-01
-- **Zakres:** układ trzech kolumn z regulowaną szerokością i chowanym prawym panelem (jeden klawisz). Pasek górny: repo, cel, licznik sesji, LOC. Pasek stanu ze skrótami. Tokeny kolorów z makiet: motyw jasny i ciemny, paleta diffa standard i daltonizm, gęstość komfort i kompakt. Dołączony font JetBrains Mono, regulowany rozmiar fontu.
+- **Zakres:** układ trzech kolumn z regulowaną szerokością i chowanym prawym panelem (jeden klawisz). Pasek górny: repo, cel, licznik sesji, LOC. Pasek stanu ze skrótami. Routing ekranów.
+- **Kryteria akceptacji:** testy komponentów: zmiana szerokości kolumny zapamiętana między uruchomieniami; chowanie panelu klawiszem nie zmienia fokusu w diffie.
+- **Rozmiar:** ~250 LOC.
+
+#### P1-17b · Motywy, palety i gęstość
+
+- **Zależy od:** P1-17a
+- **Zakres:** tokeny kolorów z makiet: motyw jasny i ciemny, paleta diffa standard i daltonizm, gęstość komfort i kompakt. Dołączony font JetBrains Mono, regulowany rozmiar fontu.
 - **Kryteria akceptacji:** zrzuty Playwright 2 motywy × 2 palety × 2 gęstości porównane z wzorcem; test kontrastu: tekst i znaki `+`/`−` ≥ 4,5:1 w każdym wariancie (skrypt liczący kontrast z tokenów).
-- **Rozmiar:** ~350 LOC.
+- **Rozmiar:** ~250 LOC.
 
-#### P1-18 · Diff obok siebie
+#### P1-18a · Diff obok siebie
 
-- **Zależy od:** S1, P1-11, P1-17
-- **Zakres:** widok pliku obok siebie według wyniku S1 (`MergeView` z [`@codemirror/merge`](https://github.com/codemirror/merge) albo dwa `EditorView`), z hunkami i diffem słów z rdzenia (nie z algorytmu w przeglądarce), podświetleniem składni C#, XAML/XML, JSON i TypeScript, synchronizacją przewijania obu stron i znacznikami „base”/„head” z SHA nad kolumnami.
-- **Kryteria akceptacji:** test komponentu: linie dodane, usunięte i zmienione mają klasy zgodne z hunkami z rdzenia; test Playwright: plik 10 000 linii przewija się ≥ 55 fps p95 (pomiar w `bench/`); ten sam plik z hunkami w obu kolumnach ma wyrównane linie.
-- **Rozmiar:** ~400 LOC.
+- **Zależy od:** S1, P1-11, P1-17a
+- **Zakres:** widok pliku obok siebie według wyniku S1 (`MergeView` z [`@codemirror/merge`](https://github.com/codemirror/merge) albo dwa `EditorView`), z hunkami i diffem słów z rdzenia (nie z algorytmu w przeglądarce), synchronizacją przewijania obu stron i znacznikami „base”/„head” z SHA nad kolumnami.
+- **Kryteria akceptacji:** test komponentu: linie dodane, usunięte i zmienione mają klasy zgodne z hunkami z rdzenia; ten sam plik z hunkami w obu kolumnach ma wyrównane linie; przewijanie jednej strony przewija drugą do odpowiadającej linii.
+- **Rozmiar:** ~300 LOC.
+
+#### P1-18b · Podświetlanie składni i pomiar widoku
+
+- **Zależy od:** P1-18a
+- **Zakres:** podświetlanie C#, XAML/XML, JSON i TypeScript (pakiety języków CodeMirror wybrane w zadaniu, z linkami), liczone tylko dla viewportu. Scenariusz w `bench/` dla pliku 10 000 linii.
+- **Kryteria akceptacji:** testy komponentów: tokeny słów kluczowych C# i atrybutów XAML mają klasy składni; pomiar: plik 10 000 linii przewija się ≥ 55 fps p95 (`bench/`, metoda z S1).
+- **Rozmiar:** ~200 LOC.
 
 #### P1-19 · Jeden widok i przełączniki
 
-- **Zależy od:** P1-18
+- **Zależy od:** P1-18a
 - **Zakres:** widok zunifikowany (przy `unifiedMergeView` z `mergeControls: false`, bo domyślnie pokazuje przyciski akceptacji i odrzucenia zmian), przełącznik „Obok siebie / Jeden widok”, automatyczne przejście na jeden widok poniżej progu szerokości (z adnotacją „Włącza się sam w wąskim oknie” jak w makiecie `Main`), przełącznik „Ignoruj wcięcia”.
 - **Kryteria akceptacji:** testy: zmiana szerokości okna poniżej progu przełącza widok i wraca po poszerzeniu, o ile użytkownik nie wybrał trybu ręcznie; pozycja przewijania i bieżący hunk zostają po przełączeniu.
 - **Rozmiar:** ~250 LOC.
 
 #### P1-20 · Zwijanie kontekstu i nagłówki hunków
 
-- **Zależy od:** P1-18, P1-22
+- **Zależy od:** P1-18a, P1-22
 - **Zakres:** zwinięty niezmieniony kontekst z rozwijaniem (całość lub po 20 linii), nagłówek hunka `@@ old → new @@` z nazwą symbolu (np. `FrameAnalyzer › Analyze(ImageProxy, CancellationToken)`).
 - **Kryteria akceptacji:** testy komponentów: rozwinięcie nie przesuwa bieżącego hunka; nagłówek pokazuje symbol z `lupa-syntax`, a przy jego braku sam zakres linii.
 - **Rozmiar:** ~200 LOC.
 
 #### P1-21 · Lista plików
 
-- **Zależy od:** P1-17, P1-10
+- **Zależy od:** P1-17a, P1-10
 - **Zakres:** lewa kolumna w trybie „Wszystkie pliki”: drzewo katalogów, `+`/`−` per plik, stan „viewed”, grupa „Zwinięte automatycznie” dla plików generowanych i formatowania. Wirtualizacja listy. W środku zawsze jeden plik, następny wczytywany w tle.
 - **Kryteria akceptacji:** test: lista 5 000 plików renderuje < 50 elementów DOM i przewija się bez spadków poniżej 55 fps (`bench/`); przejście do następnego pliku z cache < 50 ms.
 - **Rozmiar:** ~300 LOC.
@@ -252,7 +275,7 @@ Układ ekranu „Otwórz”: po lewej cztery zakładki źródeł (`1`–`4`), w 
 
 #### P1-26 · Wątki GitLaba w diffie (odczyt)
 
-- **Zależy od:** P1-15, P1-18
+- **Zależy od:** P1-15, P1-18a
 - **Zakres:** dyskusje MR przypięte do linii po `position`, w osobnym paśmie pod linią, nie na kodzie. Wątki z poprzednich wersji MR oznaczone jako nieaktualne, z linkiem do wersji. Znacznik „wątek” w gutterze.
 - **Kryteria akceptacji:** testy mapowania pozycji (linia dodana, usunięta, kontekst, zakres wielu linii, plik ze zmienioną nazwą, wątek z wcześniejszej wersji); test komponentu: treść komentarza z `<script>` i `<img onerror>` renderuje się jako tekst.
 - **Rozmiar:** ~350 LOC.
@@ -260,7 +283,7 @@ Układ ekranu „Otwórz”: po lewej cztery zakładki źródeł (`1`–`4`), w 
 
 #### P1-27 · Bezpieczne renderowanie treści MR
 
-- **Zależy od:** P1-17
+- **Zależy od:** P1-17a
 - **Zakres:** jeden komponent dla Markdownu z MR (opis, komentarze) bez surowego HTML, z linkami otwieranymi w przeglądarce systemowej po potwierdzeniu, bez ładowania zdalnych obrazów. Nazwy plików, gałęzi i autorów zawsze jako tekst. Reguła ESLint zakazująca `dangerouslySetInnerHTML` w `app/src`.
 - **Kryteria akceptacji:** testy z zestawem wrogich danych w `lupa-testkit` (XSS, `javascript:` w linku, bardzo długi tytuł, znaki sterujące RTL w nazwie pliku): żaden nie wykonuje kodu, a znaki RTL są widoczne jako znaczniki; `npm run lint` failuje na pliku z `dangerouslySetInnerHTML`.
 - **Rozmiar:** ~250 LOC.
@@ -270,7 +293,7 @@ Układ ekranu „Otwórz”: po lewej cztery zakładki źródeł (`1`–`4`), w 
 
 #### P1-28 · Pomiary budżetów wydajności
 
-- **Zależy od:** P1-18, P1-21, P1-23
+- **Zależy od:** P1-18a, P1-21, P1-23
 - **Zakres:** `bench/`: generator repozytorium referencyjnego (5 000 plików, MR z 60 plikami i 2 000 LOC, plik 10 000 linii), scenariusze dla każdego budżetu z `architecture.md`, raport JSON i Markdown, komenda `npm run bench`. W CI jako raport, bez blokowania. Na maszynie referencyjnej zespołu jako bramka fazy.
 - **Kryteria akceptacji:** `npm run bench` daje raport z p50 i p95 dla pięciu budżetów; raport z maszyny referencyjnej dołączony do opisu zmiany.
 - **Rozmiar:** ~350 LOC.
@@ -279,14 +302,14 @@ Układ ekranu „Otwórz”: po lewej cztery zakładki źródeł (`1`–`4`), w 
 
 - **Zależy od:** P1-01
 - **Zakres:** instalator Windows z bundlera Tauri, wersja w oknie „O programie”. Logi lokalne z rotacją, poziomem w ustawieniach i redakcją tokenów oraz treści MR (do logu trafiają identyfikatory, nie treść). Instrukcja instalacji w `README.md`.
-- **Kryteria akceptacji:** instalacja i odinstalowanie na czystym Windows bez uprawnień administratora albo z udokumentowanym wymaganiem; test: logi po scenariuszu z tokenem i treścią MR nie zawierają żadnego z nich.
+- **Kryteria akceptacji:** instalacja i odinstalowanie na czystym Windows na koncie bez uprawnień administratora (instalacja per użytkownik; opcję bundlera zadanie sprawdza w [dokumentacji Tauri 2](https://v2.tauri.app/distribute/windows-installer/), status linku **NIEZWERYFIKOWANY**); test: logi po scenariuszu z tokenem i treścią MR nie zawierają żadnego z nich.
 - **Rozmiar:** ~200 LOC.
 - **Przegląd:** security (logi).
 
 #### P1-30 · Metryki bazowe zespołu
 
-- **Zależy od:** P1-14
-- **Zakres:** komenda w ustawieniach „Policz metryki bazowe” dla projektu: mediana czasu do pierwszego review, liczba rund na MR, mediana rozmiaru MR, z ostatnich 3 miesięcy, z API GitLaba. Wynik zapisany lokalnie i eksportowany do Markdown. Zastępuje pomiar bazy z fazy 0 z `docs/input/plan.md`.
+- **Zależy od:** P1-14b
+- **Zakres:** komenda w ustawieniach „Policz metryki bazowe” dla projektu, z ostatnich 3 miesięcy, z API GitLaba: mediana czasu do pierwszego review, liczba rund na MR, mediana rozmiaru MR i liczba błędów po merge (issues z etykietą ustawioną w konfiguracji, powiązane z MR; jeśli zespół nie prowadzi błędów w GitLabie, metryka zostaje pusta z adnotacją, patrz Q10). Wynik zapisany lokalnie i eksportowany do Markdown. Zastępuje pomiar bazy z fazy 0 z `docs/input/plan.md`.
 - **Kryteria akceptacji:** testy na atrapie API z ustalonym zestawem MR dają znane wartości median; eksport nie zawiera tytułów ani treści MR, tylko liczby i daty.
 - **Rozmiar:** ~250 LOC.
 

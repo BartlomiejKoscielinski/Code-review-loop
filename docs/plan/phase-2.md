@@ -10,14 +10,14 @@
 
 | Kamień | Zadania | Po nim działa |
 | --- | --- | --- |
-| 2.0 Skrzynka | P2-01 … P2-03 | lista MR do review z rozmiarem, pipeline'em i nową wersją |
+| 2.0 Skrzynka | P2-01 … P2-03, P2-35 | lista MR do review z rozmiarem, pipeline'em, ryzykiem i czasem |
 | 2.1 Reguły zespołu | P2-04 … P2-07 | `.review/`, mapa ryzyka, hotspoty, checklisty przy hunkach |
 | 2.2 Trasa | P2-08 … P2-14 | jednostki, graf, trasa, lewa kolumna, briefing |
-| 2.3 Komentarze i publikacja | P2-15 … P2-22 | drafty na liniach, wątki, bramka, publikacja, offline |
-| 2.4 Interdiff | P2-23 … P2-25 | „co się zmieniło od mojego review”, także po rebase |
+| 2.3 Komentarze i publikacja | P2-15 … P2-22b | drafty na liniach, wątki, bramka, publikacja, offline |
+| 2.4 Interdiff | P2-23 … P2-25, P2-36 | „co się zmieniło od mojego review”, także po rebase |
 | 2.5 Tryby i kontekst | P2-26 … P2-29 | self-review, blame, spójność wzorca, przeniesiony kod |
 | 2.6 Wykonanie kodu MR | P2-30 … P2-33 | różnica ostrzeżeń base ↔ head |
-| 2.7 Dystrybucja | P2-34 | auto-update |
+| 2.7 Dystrybucja | P2-34, P2-37 | auto-update, konfiguracja organizacji |
 
 ## Zadania
 
@@ -25,39 +25,36 @@
 
 #### P2-01 · Skrzynka: dane i odświeżanie
 
-- **Zależy od:** P1-14, P1-15
+- **Zależy od:** P1-14b, P1-15
 - **Zakres:**
   - zakładki „Do mojego review”, „Moje MR”, „Obserwowane” (MR przypięte lokalnie);
   - odświeżanie przez polling z `updated_after` (interwał w ustawieniach, wstrzymany przy braku sieci);
   - stan synchronizacji w pasku („zsynchronizowany 12 s temu”);
   - dane w SQLite, więc skrzynka startuje z cache bez sieci.
 
-  Filtr „Do mojego review”: `scope=reviews_for_me` na GitLabie 18.4 i nowszym, a na starszych `reviewer_username=<ja>` ([Merge requests API](https://docs.gitlab.com/api/merge_requests/)). Wybór według wersji z P1-14.
+  Filtr „Do mojego review”: `scope=reviews_for_me` na GitLabie 18.4 i nowszym, a na starszych `reviewer_username=<ja>` ([Merge requests API](https://docs.gitlab.com/api/merge_requests/)). Wybór według wersji z P1-14b.
 - **Kryteria akceptacji:** testy na atrapie API: wybór filtru według wersji (18.3 i 18.4), pierwsze pobranie, przyrostowe z `updated_after`, MR zamknięty znika, brak sieci pokazuje dane z cache i stan „offline”; start do skrzynki z cache < 1 s (`bench/`).
 - **Rozmiar:** ~350 LOC.
 
 #### P2-02 · Skrzynka: ekran
 
-- **Zależy od:** P2-01, P1-17
+- **Zależy od:** P2-01, P1-17a
 - **Zakres:** ekran według makiety `Inbox`:
   - kolumny: MR, rozmiar (LOC, pliki, pasek), ryzyko z powodem (z P2-05, do tego czasu „—”), pipeline, czas oczekiwania;
   - sortowanie „najdłużej czeka” domyślnie; filtry „Wysokie ryzyko”, „Nowa wersja od mojego review”, „Czeka ponad dzień”;
   - wyszukiwanie po MR, gałęzi i autorze;
   - panel podglądu z rozmiarem, szacowanym czasem i informacją „od Twojego ostatniego review”;
-  - `↑`/`↓` wybór, `Enter` briefing, skrót „Od razu do trasy”.
+  - `↑`/`↓` wybór, `Enter` briefing, `t` „Od razu do trasy”;
+  - plakietka „Duży: N przejść” i szacowany czas z P2-35.
 - **Kryteria akceptacji:** testy komponentów dla stanów z makiety (pipeline czerwony z ostrzeżeniem, w toku, zielony; pierwsze review; nowa wersja); test Playwright: wybór MR i wejście do briefingu wyłącznie z klawiatury.
 - **Rozmiar:** ~380 LOC.
 
-#### P2-03 · Prefetch w tle, pipeline i „nowa wersja”
+#### P2-03 · Prefetch w tle i pipeline
 
 - **Zależy od:** P2-01
-- **Zakres:**
-  - kolejka zadań w tle w `lupa-review`: limit równoległości, priorytet dla MR zaznaczonego w skrzynce, anulowanie, ponowienia;
-  - fetch refów MR i policzenie list plików przed kliknięciem;
-  - status pipeline'u;
-  - zapis `head_sha` przy publikacji review (P2-21) i znacznik „nowa wersja od Twojego review” z liczbą commitów i LOC od tamtej wersji.
-- **Kryteria akceptacji:** testy: 10 MR w kolejce przy limicie 2 nie uruchamia więcej niż 2 fetchy naraz; zmiana zaznaczenia przesuwa MR na początek kolejki; anulowanie zatrzymuje proces `git`; znacznik pojawia się tylko, gdy `head_sha` różni się od zapisanego.
-- **Rozmiar:** ~350 LOC.
+- **Zakres:** kolejka zadań w tle w `lupa-review`: limit równoległości, priorytet dla MR zaznaczonego w skrzynce, anulowanie, ponowienia. Fetch refów MR i policzenie list plików przed kliknięciem. Status pipeline'u. Znacznik „nowa wersja od Twojego review” powstaje w P2-23, ryzyko i szacowany czas w P2-35.
+- **Kryteria akceptacji:** testy: 10 MR w kolejce przy limicie 2 nie uruchamia więcej niż 2 fetchy naraz; zmiana zaznaczenia przesuwa MR na początek kolejki; anulowanie zatrzymuje proces `git`; status pipeline'u odświeża się z pollingiem skrzynki.
+- **Rozmiar:** ~300 LOC.
 
 ### 2.1 Reguły zespołu
 
@@ -72,7 +69,7 @@
 
   Dla celów lokalnych i commitów gałęzią docelową jest gałąź ustawiona dla repo.
 - **Kryteria akceptacji:**
-  - test: MR zmieniający `.review/risk.yaml` nie zmienia ryzyka liczonego dla tego MR;
+  - test: MR zmieniający `.review/rules/risk.yaml` nie zmienia ryzyka liczonego dla tego MR;
   - test: niepoprawny plik daje błąd z numerem linii i Lupa działa dalej na domyślnych;
   - test: regex o wykładniczym czasie odrzucony albo ograniczony czasem.
 - **Rozmiar:** ~350 LOC.
@@ -97,7 +94,7 @@
 
 #### P2-07 · Checklisty w panelu kontekstu
 
-- **Zależy od:** P2-06, P1-17
+- **Zależy od:** P2-06, P1-17a
 - **Zakres:** prawa kolumna: pozycje checklisty dopasowane do bieżącego hunka, „potwierdź” i „pomiń z powodem”, znacznik „reguła” w gutterze. Stan zapisany w sesji review.
 - **Kryteria akceptacji:** testy komponentów: potwierdzenie i pominięcie z powodem trafiają do stanu sesji; pozycja `blocking` bez decyzji jest widoczna dla bramki (P2-19).
 - **Rozmiar:** ~250 LOC.
@@ -145,13 +142,22 @@
 - **Zależy od:** P2-11
 - **Zakres:** kroki 6–8 algorytmu:
   - szablon warstw z `config.yaml` (kontrakt → testy → logika → ViewModel → widok → kod platformowy → DI i konfiguracja), w warstwie definicje przed użyciami, cykle łączone w jeden krok;
+  - przydział jednostek do warstw według reguł z `config.yaml`, z domyślnymi:
+    - kontrakt: interfejsy, rekordy i klasy DTO;
+    - testy: projekty i pliki testowe;
+    - ViewModel: `*ViewModel.cs`;
+    - widok: code-behind `*.xaml.cs`, potem `*.xaml`;
+    - kod platformowy: `Platforms/**`;
+    - DI i konfiguracja: `MauiProgram.cs`, `*.csproj`, manifesty;
+    - logika: reszta;
+  - krawędź XAML → code-behind jest skierowana (XAML używa code-behind), więc para nie tworzy cyklu i daje dwa kroki;
   - kierunek ustawiany w `config.yaml`: od definicji albo od punktu wejścia;
   - czas kroku: LOC × mnożnik ryzyka × mnożnik nowości (czy recenzent zmieniał lub przeglądał plik w ostatnich 6 miesiącach);
   - podział na przejścia przy ok. 60 min lub 400 LOC, zawsze na granicy wątku;
   - kroki „kosmetyka” i „Całość”.
 
   Nazwy kroków deterministyczne: warstwa i główny symbol, np. „Kontrakt · ICameraFrameSource”.
-- **Kryteria akceptacji:** test: trasa dla !482 ma 6 kroków w kolejności z tabeli w `docs/input/plan.md`, z `Resource.designer.cs` w krokach zwiniętych i krokiem „Całość” na końcu; test: MR 900 LOC z dwoma wątkami dzieli się na dwa przejścia na granicy wątku; test: zmiana kierunku w konfiguracji odwraca kolejność w warstwie.
+- **Kryteria akceptacji:** test: trasa dla !482 ma 6 kroków w kolejności z tabeli w `docs/input/plan.md` (`ICameraFrameSource` → kontrakt, `FrameAnalyzerTests` → testy, `FrameAnalyzer` → logika, `ScannerPage.xaml.cs` → widok krok 4, `ScannerPage.xaml` → widok krok 5, `MauiProgram` → DI), z `Resource.designer.cs` w krokach zwiniętych i krokiem „Całość” na końcu; test: MR 900 LOC z dwoma wątkami dzieli się na dwa przejścia na granicy wątku; test: zmiana kierunku w konfiguracji odwraca kolejność w warstwie.
 - **Rozmiar:** ~350 LOC.
 
 #### P2-13 · Trasa w lewej kolumnie
@@ -163,7 +169,7 @@
   - przełącznik „Trasa / Wszystkie pliki”; przeciąganie kroku; `n`/`p` po krokach.
 
   Trasa nie przestawia się w trakcie sesji.
-- **Kryteria akceptacji:** testy komponentów dla stanów z makiety `Main`; test: przeciągnięcie kroku zapisuje własną kolejność w sesji, a nowe dane z rdzenia jej nie nadpisują.
+- **Kryteria akceptacji:** testy komponentów dla stanów z makiety `Main`: krok bieżący z rozwiniętymi hunkami („1 · sygnatura”, „2 · ciało Analyze”, „3 · Dispose()”), krok odwiedzony, krok ze znacznikiem checklisty, krok „zmiana w testach potwierdzona”, grupa „Zwinięte automatycznie”, tryb „Wszystkie pliki (7)”; test: przeciągnięcie kroku zapisuje własną kolejność w sesji, a nowe dane z rdzenia jej nie nadpisują.
 - **Rozmiar:** ~380 LOC.
 
 #### P2-14 · Briefing deterministyczny
@@ -191,7 +197,7 @@
 
 #### P2-16 · Edytor komentarza i drafty lokalne
 
-- **Zależy od:** P2-15, P1-18
+- **Zależy od:** P2-15, P1-18a
 - **Zakres:**
   - `c` na linii lub zaznaczeniu otwiera edytor inline pod linią;
   - szablony Conventional Comments (`issue`, `suggestion`, `question`, `nitpick` + `blocking`/`non-blocking`);
@@ -205,14 +211,14 @@
 
 - **Zależy od:** P2-16
 - **Zakres:** tworzenie, edycja i usuwanie `draft_notes` ([Draft Notes API](https://docs.gitlab.com/api/draft_notes/)) dla celów MR, stan synchronizacji per draft, ponowienia. `position` w draft notes działa od GitLaba 16.3. Na starszej instancji drafty zostają lokalnie, a publikacja tworzy wątki z pozycją jednym ruchem w P2-21 (endpoint i jego zachowanie sprawdza zadanie w dokumentacji). Dla celów lokalnych drafty zostają notatkami lokalnymi (P2-26).
-- **Kryteria akceptacji:** testy na atrapie API: utworzenie z poprawnym `position`; edycja i usunięcie; błąd 4xx zostawia draft lokalnie z komunikatem; brak duplikatów po ponowieniu po timeoucie (idempotencja po lokalnym identyfikatorze).
+- **Kryteria akceptacji:** testy na atrapie API: utworzenie z poprawnym `position`; edycja i usunięcie; dla wersji < 16.3 brak wywołań `draft_notes` z `position`, a publikacja w P2-21 tworzy jeden wątek z pozycją na każdy lokalny draft (endpoint wątków z pozycją potwierdzony przez `fact-checker` przed kodem); błąd 4xx zostawia draft lokalnie z komunikatem; brak duplikatów po ponowieniu po timeoucie (idempotencja po lokalnym identyfikatorze).
 - **Rozmiar:** ~300 LOC.
 
 #### P2-18 · Odpowiedzi i rozwiązywanie wątków
 
 - **Zależy od:** P2-17, P1-26
-- **Zakres:** „Odpowiedz” i „Rozwiąż wątek” na istniejących wątkach GitLaba. Odpowiedź jako draft, publikowana razem z review. Rozwiązanie wątku przez parametr draftu albo osobne wywołanie, według dokumentacji i wyniku S3 (fakt **NIEZWERYFIKOWANY**, sprawdza `fact-checker` przed zadaniem).
-- **Kryteria akceptacji:** testy na atrapie API dla odpowiedzi i rozwiązania; stan „Wątek rozwiązany, opublikuje się razem z review” z cofnięciem, jak w makiecie `Interdiff`.
+- **Zakres:** „Odpowiedz” (`r`) i „Rozwiąż wątek” (`e`) na istniejących wątkach GitLaba (skróty z makiet `Main` i `Interdiff`). Odpowiedź jako draft, publikowana razem z review. Rozwiązanie wątku przez parametr draftu albo osobne wywołanie, według dokumentacji i wyniku S3 (fakt **NIEZWERYFIKOWANY**, sprawdza `fact-checker` przed zadaniem).
+- **Kryteria akceptacji:** wynik weryfikacji mechanizmu rozwiązania wątku (`fact-checker`) z linkiem w opisie zmiany przed kodem; testy na atrapie API dla odpowiedzi i rozwiązania według tego wyniku; skróty `r` i `e` działają na wątku z fokusem; stan „Wątek rozwiązany, opublikuje się razem z review” z cofnięciem, jak w makiecie `Interdiff`.
 - **Rozmiar:** ~250 LOC.
 
 #### P2-19 · Reguły bramki
@@ -240,7 +246,7 @@
   - wybór decyzji z opisem, dlaczego opcja jest niedostępna;
   - notatka podsumowująca (w tej fazie pisana ręcznie, szablon z listy uwag blokujących);
   - przycisk publikacji z nazwą decyzji.
-- **Kryteria akceptacji:** testy komponentów dla stanów z makiety; test Playwright: trasa → bramka → wybór decyzji z klawiatury.
+- **Kryteria akceptacji:** testy komponentów dla stanów z makiety `Gate`: „Sprawdzenia · 5 z 6” z otwartą uwagą blokującą i `Approve` niedostępnym, wszystkie sprawdzenia zielone z `Approve` dostępnym, decyzja `Reviewed`, decyzja `Requested changes` z etykietą „rekomendowane”, ekran „Opublikowano w GitLabie”; test Playwright: trasa → bramka → wybór decyzji z klawiatury.
 - **Rozmiar:** ~350 LOC.
 
 #### P2-21 · Publikacja
@@ -248,23 +254,28 @@
 - **Zależy od:** P2-20
 - **Zakres:**
   - `bulk_publish` z notatką i `reviewer_state` (`reviewed` albo `requested_changes`), dostępne od GitLaba 19.2; dla `Approve` dodatkowo `approve` po udanej publikacji (`bulk_publish` nie zapisuje formalnego approve);
-  - wariant zastępczy dla GitLaba 15.11–19.1: `bulk_publish` bez notatki, notatka jako osobny komentarz MR, a stan recenzenta tylko wtedy, gdy instancja ma do tego endpoint (sprawdza zadanie). UI informuje o ograniczeniu;
+  - wariant zastępczy dla GitLaba 15.11–19.1: `bulk_publish` bez notatki, potem notatka jako osobny komentarz MR. Stanu recenzenta nie ustawiamy, a UI informuje o ograniczeniu. Jeśli `fact-checker` potwierdzi endpoint stanu recenzenta dla wersji zespołu, dochodzi on jako trzecie wywołanie;
   - zapis `head_sha` i wersji MR;
   - ekran „Opublikowano” z „Następny MR w skrzynce”.
 - **Kryteria akceptacji:**
-  - testy na atrapie API: kolejność wywołań dla wersji 19.2 i dla wariantu zastępczego; częściowa awaria (publikacja OK, approve błąd) daje stan do ponowienia tylko approve;
+  - testy na atrapie API: kolejność wywołań dla 19.2 (`bulk_publish` z notatką i `reviewer_state`, potem `approve`) i dla 18.x (`bulk_publish`, komentarz z notatką, potem `approve`); częściowa awaria (publikacja OK, approve błąd) daje stan do ponowienia tylko approve;
   - drugi klik „Opublikuj” nie wysyła drugi raz;
-  - publikacja odrzucona, gdy `head_sha` w GitLabie różni się od tego w sesji (przejście do P2-22).
+  - publikacja odrzucona, gdy `head_sha` w GitLabie różni się od tego w sesji (przejście do P2-22a).
 - **Rozmiar:** ~300 LOC.
 
-#### P2-22 · Nowa wersja w trakcie review i praca offline
+#### P2-22a · Nowa wersja w trakcie review
 
 - **Zależy od:** P2-21
-- **Zakres:**
-  - nowy push w trakcie review: przeliczenie pozycji draftów na nowe `diff_refs`; linie niezmienione przenoszone automatycznie, zmienione do potwierdzenia przez recenzenta;
-  - bez sieci: drafty w kolejce, synchronizacja po powrocie, blokada publikacji do czasu synchronizacji.
-- **Kryteria akceptacji:** testy: draft na linii bez zmian w nowej wersji przenosi się z nowym numerem; draft na linii zmienionej dostaje stan „do potwierdzenia”; utrata sieci w połowie synchronizacji nie gubi ani nie dubluje draftów.
-- **Rozmiar:** ~350 LOC.
+- **Zakres:** nowy push w trakcie review: przeliczenie pozycji draftów na nowe `diff_refs`. Linie niezmienione przenoszone automatycznie, zmienione do potwierdzenia przez recenzenta. Ostrzeżenie w pasku górnym. Kotwiczenie to według `docs/input/plan.md` najczęstsze źródło błędów, dlatego zadanie jest osobne.
+- **Kryteria akceptacji:** testy tablicowe: draft na linii bez zmian przenosi się z nowym numerem; draft na linii zmienionej dostaje stan „do potwierdzenia”; draft w pliku usuniętym w nowej wersji dostaje stan „plik usunięty”; draft z zakresem częściowo zmienionym jest do potwierdzenia.
+- **Rozmiar:** ~300 LOC.
+
+#### P2-22b · Praca offline
+
+- **Zależy od:** P2-22a
+- **Zakres:** bez sieci drafty trafiają do kolejki, synchronizacja po powrocie, blokada publikacji do czasu synchronizacji. Konflikt z nową wersją MR przechodzi przez P2-22a.
+- **Kryteria akceptacji:** testy: utrata sieci w połowie synchronizacji nie gubi ani nie dubluje draftów; publikacja jest zablokowana z komunikatem, dopóki kolejka nie jest pusta.
+- **Rozmiar:** ~200 LOC.
 
 ### 2.4 Interdiff
 
@@ -275,8 +286,9 @@
   - przełącznik „Od mojego review · vN → vM” i „Cały MR”;
   - zwykły push (stary head jest przodkiem nowego): diff `head_stary..head_nowy`;
   - grupy „Do przejrzenia” i „Bez zmian od vN” (z zachowanym „viewed”);
-  - LOC i szacowany czas interdiffu.
-- **Kryteria akceptacji:** testy: rozpoznanie zwykłego pushu po przodku; plik bez zmian zachowuje „viewed”; zmiana pliku zdejmuje znacznik.
+  - LOC i szacowany czas interdiffu;
+  - znacznik „nowa wersja od Twojego review” w skrzynce i briefingu (porównanie `head_sha` z zapisanym w P2-21, z liczbą commitów i LOC).
+- **Kryteria akceptacji:** testy: rozpoznanie zwykłego pushu po przodku; plik bez zmian zachowuje „viewed”; zmiana pliku zdejmuje znacznik; znacznik w skrzynce pojawia się tylko, gdy `head_sha` różni się od zapisanego.
 - **Rozmiar:** ~350 LOC.
 
 #### P2-24 · Interdiff po rebase
@@ -294,7 +306,7 @@
   - stany: „rozwiązane przez zmianę” (linia zmieniona przez autora), „linia bez zmian, bez odpowiedzi”;
   - panel „Twoje komentarze z vN” z akcjami „Rozwiąż” i „Przypomnij autorowi” (draft odpowiedzi);
   - informacja dla bramki, czy wątek blokujący jest nadal otwarty.
-- **Kryteria akceptacji:** testy mapowania na przykładach z makiety `Interdiff`; testy komponentów panelu.
+- **Kryteria akceptacji:** testy mapowania na przykładach z makiety `Interdiff` (R46 → R46–47 przy zmianie linii, R52 → R53 przy przesunięciu); testy komponentów panelu dla stanów: wątek blokujący z odpowiedzią autora, wątek rozwiązany z cofnięciem, „bez odpowiedzi” z „Przypomnij autorowi”, nitpick z odpowiedzią i „Rozwiąż”, brak otwartych uwag blokujących.
 - **Rozmiar:** ~350 LOC.
 
 ### 2.5 Tryby i kontekst
@@ -326,7 +338,7 @@
 
 #### P2-29 · Przeniesiony kod
 
-- **Zależy od:** P1-10, P1-18
+- **Zależy od:** P1-10, P1-18a
 - **Zakres:** wykrywanie bloków przeniesionych między plikami i w pliku (próg minimalnej liczby linii, porównanie po znormalizowanych białych znakach). Przeniesiony kod przygaszony, z linkiem „przeniesione z `Plik.cs:120`”. Zmiany wewnątrz przeniesionego bloku nadal widoczne.
 - **Kryteria akceptacji:** testy: przeniesienie metody do innego pliku; przeniesienie ze zmianą jednej linii; bloki poniżej progu nie są oznaczane.
 - **Rozmiar:** ~300 LOC.
@@ -341,18 +353,19 @@ Różnica ostrzeżeń wymaga buildu base i head, czyli wykonania kodu z repozyto
 - **Zakres:** spike `mr-code-execution-isolation` i ADR. Pytania:
   - które warianty działają na Windows zespołu: osobny proces z oczyszczonym środowiskiem; osobne konto lokalne; Windows Sandbox; AppContainer; artefakt SARIF z CI zamiast lokalnego buildu;
   - jak blokować sieć i dostęp do repo dewelopera;
+  - jak przygotować kopię kodu do wykonania, żeby nie dawała dostępu do `.git` repo dewelopera (worktree, osobny klon, `git archive`), z testem wrogiego builda zapisującego `.git/hooks` i `.git/config`;
   - czy semantyka „head” może korzystać z ładowania projektów gałęzi docelowej (ładowanie przez `MSBuildWorkspace` to design-time build w procesie BuildHost, czyli wykonanie tasków i targetów) (kod już po review) i samych plików `.cs` z MR, z flagą, gdy MR zmienia `.csproj`, `Directory.Build.*` albo `.targets`.
 
   ADR opisuje model zaufania, granicę strefy D z `architecture.md`, limity czasu i to, co wraca jako niezaufane dane.
 - **Kryteria akceptacji:** spike zamknięty z dowodami (`/spike close`); ADR w statusie „Proponowany” z przeglądem `security-reviewer` bez otwartych znalezisk wysokich i krytycznych; decyzja człowieka (status „Zaakceptowany”) przed P2-32.
-- **Rozmiar:** spike + ADR, bez kodu aplikacji.
+- **Rozmiar:** spike + ADR, bez kodu aplikacji. Limit spike'a: 12 h.
 - **Przegląd:** security.
 
-#### P2-31 · Worktree per cel w katalogu cache
+#### P2-31 · Kopia kodu per cel w katalogu cache
 
-- **Zależy od:** P1-04, P1-15
-- **Zakres:** `git worktree add` dla base i head w katalogu cache narzędzia (nigdy w working copy dewelopera), z limitem liczby i miejsca, sprzątaniem (`worktree prune`) i blokadą równoległego użycia. Ścieżki krótkie (limit długości ścieżek Windows).
-- **Kryteria akceptacji:** testy: worktree powstaje wewnątrz katalogu cache także przy nazwach gałęzi z `..`, `/` i znakami spoza ASCII; po przekroczeniu limitu najstarszy worktree jest usuwany; usunięcie worktree nie dotyka repo dewelopera (test sprawdza `git status` repo źródłowego).
+- **Zależy od:** P1-04, P1-15, P2-30 (zaakceptowany ADR)
+- **Zakres:** kopia kodu base i head w katalogu cache narzędzia (nigdy w working copy dewelopera), metodą z ADR z P2-30. `git worktree add` z `docs/input/plan.md` współdzieli `.git` z repo dewelopera, więc kod z MR uruchomiony w worktree mógłby zapisać hooki lub `core.hooksPath` w repo dewelopera. ADR rozstrzyga między worktree z ochroną, osobnym klonem a eksportem drzewa (`git archive`). Dalej: z limitem liczby i miejsca, sprzątaniem (`worktree prune`) i blokadą równoległego użycia. Ścieżki krótkie (limit długości ścieżek Windows).
+- **Kryteria akceptacji:** testy: worktree powstaje wewnątrz katalogu cache także przy nazwach gałęzi z `..`, `/` i znakami spoza ASCII; po przekroczeniu limitu najstarszy worktree jest usuwany; usunięcie kopii nie dotyka repo dewelopera (test sprawdza `git status` repo źródłowego); skrypt w kopii, który próbuje zapisać `.git/hooks` i `.git/config`, nie zmienia repo dewelopera.
 - **Rozmiar:** ~250 LOC.
 - **Przegląd:** security.
 
@@ -391,6 +404,30 @@ Różnica ostrzeżeń wymaga buildu base i head, czyli wykonania kodu z repozyto
 - **Zależy od:** P1-29, odpowiedź na pytanie o kanał dystrybucji (`open-questions.md`)
 - **Zakres:** updater Tauri z wewnętrznego kanału, podpisane aktualizacje, sprawdzanie w tle i instalacja po potwierdzeniu użytkownika. Klucz podpisu poza repo (zmienna środowiskowa w CI).
 - **Kryteria akceptacji:** aktualizacja z wersji N do N+1 na Windows z kanału testowego (zapis kroków i wyniku w opisie zmiany); aktualizacja z błędnym podpisem jest odrzucona.
+- **Rozmiar:** ~200 LOC.
+- **Przegląd:** security.
+
+#### P2-35 · Ryzyko i szacowany czas w skrzynce
+
+- **Zależy od:** P2-03, P2-05, P2-12
+- **Zakres:** po prefetchu w tle liczenie ryzyka MR z powodem, trasy i szacowanego czasu oraz liczby przejść. Wyniki w cache po `head_sha` i wersji `.review/`. Skrzynka pokazuje je od razu po starcie.
+- **Kryteria akceptacji:** testy: wynik dla tego samego `head_sha` liczony raz; zmiana `.review/` w gałęzi docelowej unieważnia wynik; MR 900 LOC dostaje plakietkę „Duży: 2 przejścia”.
+- **Rozmiar:** ~200 LOC.
+
+#### P2-36 · Trasa po nowej wersji i interdiff celów lokalnych
+
+- **Zależy od:** P2-23, P2-13
+- **Zakres:**
+  - po nowym pushu trasa przelicza się tylko dla zmienionych jednostek, a odwiedzone kroki bez zmian zostają odhaczone (wymaganie z `docs/input/plan.md`, „Zmiany w trakcie”);
+  - dla celów lokalnych `previous` to ostatnio przejrzana migawka, a widok „od ostatniego przeglądu” działa jak interdiff MR.
+- **Kryteria akceptacji:** testy: zmiana jednej jednostki zostawia odwiedzone pozostałe kroki; nowa jednostka trafia do właściwego kroku albo do nowego kroku na końcu wątku; dla `WorkingTree` edycja jednego pliku po przeglądzie pokazuje tylko ten plik w widoku „od ostatniego przeglądu”.
+- **Rozmiar:** ~300 LOC.
+
+#### P2-37 · Konfiguracja organizacji
+
+- **Zależy od:** P1-14b, P2-34
+- **Zakres:** URL GitLaba, dostawca AI i kanał aktualizacji ustawiane per organizacja (wymaganie z `docs/input/plan.md`, „Dystrybucja”). Plik konfiguracji organizacji dołączany do instalatora albo wskazany ścieżką, z pierwszeństwem przed ustawieniami użytkownika tam, gdzie organizacja to zablokuje. Bez sekretów w pliku.
+- **Kryteria akceptacji:** testy: wartość zablokowana przez organizację nie da się zmienić w ustawieniach; plik z polem wyglądającym na token jest odrzucony.
 - **Rozmiar:** ~200 LOC.
 - **Przegląd:** security.
 

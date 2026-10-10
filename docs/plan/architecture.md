@@ -9,7 +9,7 @@ Dokument opisuje moduły, granice zaufania, model danych, strategię testów i k
 - Rdzeń w Ruście (`crates/`, `app/src-tauri/`) ma całe I/O: Git, diff, cache, SQLite, HTTP do GitLaba, token w magazynie systemowym, uruchamianie procesów (`git`, `claude -p`, sidecar, build). Interfejs nigdy nie czeka na sieć, bo rdzeń odpowiada z cache i dosyła wyniki zdarzeniami.
 - Logika domenowa w TypeScripcie (`packages/domain/`) to czyste funkcje bez I/O: algorytm trasy, reguły bramki, budżet LOC i czasu. Łatwo je testować i są takie same dla każdego w zespole.
 - Interfejs (`app/src/`) to React + CodeMirror 6. Nie ma dostępu do sieci ani do sekretów, rozmawia wyłącznie z rdzeniem przez IPC Tauri.
-- Sidecar .NET (`sidecar/`, od fazy 3) robi semantykę C# z Roslyn. Nie ma tokenu ani dostępu do GitLaba.
+- Sidecar .NET (`sidecar/`, od fazy 3) robi semantykę C# z Roslyn. Nie ma tokenu ani dostępu do GitLaba. Uruchamia go rdzeń z API Rusta, bez capability dla webview. Gdy ładuje projekty przez MSBuild, działa w strefie D, a jego wyniki są niezaufane.
 
 Ten podział realizuje mitygację z `docs/input/plan.md` („Rust tylko dla Gita, diffa i IPC; logika domenowa w TS i .NET”), z jednym doprecyzowaniem: klient GitLaba i uruchamianie procesów też są w Ruście, bo tam jest token i tam musi być granica bezpieczeństwa.
 
@@ -30,7 +30,7 @@ crates/
   lupa-store/              # SQLite: migracje, sesje, viewed, cache
   lupa-review/             # cel review (ADR 0003), sesje, kolejka zadań w tle
   lupa-rules/              # `.review/` z gałęzi docelowej: schemat, walidacja (faza 2)
-  lupa-exec/               # uruchamianie kodu MR w izolacji (faza 2, ADR z P2-25)
+  lupa-exec/               # uruchamianie kodu MR w izolacji (faza 2, ADR z P2-30)
   lupa-ai/                 # abstrakcja dostawcy, runner `claude -p`, cache wyników (faza 3)
   lupa-testkit/            # budowanie repozytoriów testowych, atrapy GitLaba i `claude`
 packages/
@@ -51,7 +51,7 @@ Nazwy crate'ów i pakietów są wiążące dla planu. Zmiana wymaga aktualizacji
 | A. Rdzeń | proces Tauri (Rust) | token GitLaba (w pamięci, na czas wywołania), SQLite, dostęp do repo dewelopera | wykonywania kodu z MR |
 | B. Webview | UI React | dane do wyświetlenia | tokenu, sieci (CSP), HTML z treści MR |
 | C. Claude | `claude -p` jako proces potomny | pusty katalog roboczy narzędzia, migawka wybranych plików MR bez `.claude/`, `CLAUDE.md` i `.mcp.json` (przez `--add-dir`), narzędzia `Read`/`Grep`/`Glob`; szczegóły w ADR z zadania P3-01 | tokenu w środowisku, zapisu, powłoki, MCP, hooków, skilli i konfiguracji z gałęzi MR |
-| D. Wykonanie | build, testy, Stryker, MSBuild/Roslyn na kodzie MR, emulator | worktree w katalogu cache, limit czasu | tokenu w środowisku, dostępu do repo dewelopera; szczegóły w ADR z zadania P2-25 |
+| D. Wykonanie | build, testy, Stryker, sidecar ładujący projekty przez MSBuild, emulator | kopia kodu w katalogu cache (sposób kopiowania ustala ADR z P2-30: worktree współdzieli `.git` z repo dewelopera, więc może być wykluczony), limit czasu | tokenu w środowisku, dostępu do repo dewelopera; szczegóły w ADR z zadania P2-30 |
 
 Dane płynące ze stref C i D (odpowiedzi modelu, SARIF, logi testów) są niezaufane tak samo jak treść MR. Rdzeń je waliduje, a UI pokazuje jako tekst.
 
@@ -99,13 +99,13 @@ Reguły repo wymagają, żeby każda nowa zależność wynikała z planu. Poniż
 | diff | histogram z [`imara-diff`](https://github.com/pascalkuthe/imara-diff); `gix` ma własną kopię `gix-imara-diff`, więc S2 rozstrzyga, której używamy | P1-08 |
 | składnia | `tree-sitter`, gramatyki C# i XML | P1-22 |
 | SQLite | `rusqlite` z migracjami w kodzie | P1-04 |
-| sekrety | [`keyring`](https://crates.io/crates/keyring) 4.x (Credential Manager przez `windows-native-keyring-store`) | P1-14 |
-| HTTP | `reqwest` (rustls, firmowe CA dodawane, nie wyłączane) | P1-14 |
+| sekrety | [`keyring`](https://crates.io/crates/keyring) 4.x (Credential Manager przez `windows-native-keyring-store`) | P1-14a |
+| HTTP | `reqwest` (rustls, firmowe CA dodawane, nie wyłączane) | P1-14b |
 | async, serializacja, błędy | `tokio`, `serde`, `serde_json`, `thiserror` | P1-01 |
 | typy IPC | `specta` z `tauri-specta` albo `ts-rs` | P1-03 |
-| testy Rust | atrapa HTTP (`wiremock` albo `httpmock`), `tempfile`, `insta` | P1-06, P1-14 |
+| testy Rust | atrapa HTTP (`wiremock` albo `httpmock`), `tempfile`, `insta` | P1-06, P1-14b |
 | YAML | parser YAML dla `.review/` wybrany w zadaniu (`serde_yaml` nie jest już rozwijany) | P2-04 |
-| UI | `react`, `react-dom`, `vite`, `@codemirror/*`, `@codemirror/merge`, wirtualizacja listy (`@tanstack/react-virtual`) | P1-17, P1-18, P1-21 |
+| UI | `react`, `react-dom`, `vite`, `@codemirror/*`, `@codemirror/merge`, wirtualizacja listy (`@tanstack/react-virtual`) | P1-17a, P1-18a, P1-21 |
 | walidacja na granicy | `zod` | P1-03 |
 | Markdown bez HTML | `react-markdown` bez wtyczek przepuszczających surowy HTML | P1-27 |
 | testy TS | `vitest`, `@testing-library/react`, `@playwright/test` | P1-01, P1-28 |
@@ -124,7 +124,7 @@ Zasady z `.claude/rules/tests.md` obowiązują wszędzie: testy deterministyczne
 | TS domena | `vitest` | trasa, bramka, budżet; testy właściwości (ta sama zmiana w innej kolejności wejścia daje tę samą trasę) |
 | UI komponenty | `vitest` + Testing Library | stany ekranów z makiet |
 | UI przepływy | Playwright na buildzie Vite z atrapą IPC | skrzynka → briefing → trasa → bramka → publikacja |
-| Wydajność | `bench/` (Playwright + `performance.mark`, pomiary w Ruście) | budżety z `docs/input/plan.md` |
+| Wydajność | `bench/`: Playwright + `performance.mark` dla UI, pomiary w Ruście dla rdzenia, a start i WebView2 w prawdziwej aplikacji według metody ze spike'a S1 | budżety z `docs/input/plan.md` |
 | .NET | `dotnet test` (xUnit) | sidecar na projektach testowych |
 | Bezpieczeństwo | testy z wrogimi danymi w `lupa-testkit` | XSS w opisie, path traversal w nazwach plików, prompt injection, ogromne pliki |
 | Ewaluacja AI | `lupa-eval` (ręcznie, z prawdziwym `claude`) | precyzja i recall promptów, poza CI |
@@ -137,11 +137,12 @@ Zasady z `.claude/rules/tests.md` obowiązują wszędzie: testy deterministyczne
 | --- | --- | --- | --- |
 | Rust | `cargo build --workspace` | `cargo test --workspace` | `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings` |
 | TypeScript | `npm run build` | `npm test`, `npm run test:e2e` | `npm run lint`, `npm run typecheck` |
-| Aplikacja | `npm run tauri build` | `npm run bench` | — |
-| .NET (od P3-11) | `dotnet build sidecar` | `dotnet test sidecar` | `dotnet format --verify-no-changes sidecar` |
+| Aplikacja | `npm run app:build` (skrypt opakowujący `tauri build`) | `npm run bench`, `npm run check:ipc` | — |
+| Narzędzia | — | `cargo run -p lupa-ai --bin lupa-eval` (ręcznie, z prawdziwym `claude`), `cargo run -p lupa-rules --bin lupa-rules-check` | — |
+| .NET (od P3-11, wzorce do `allow` proponuje zadanie, dodaje człowiek) | `dotnet build sidecar` | `dotnet test sidecar` | `dotnet format --verify-no-changes sidecar` |
 | Hooki | — | `node --test .claude/hooks/hooks.test.mjs` | — |
 
-P1-01 dopisuje brakujące wzorce (`npm run lint *`, `npm run typecheck *`, `npm run test:e2e *`, `npm run bench *`, `npm run tauri *`) do listy `allow` w `.claude/settings.json`. Komendy instalujące pakiety zostają w `ask`.
+P1-01 wpisuje komendy do `CLAUDE.md` i **proponuje** w opisie zmiany wzorce do listy `allow` (`npm run lint *`, `npm run typecheck *`, `npm run test:e2e *`, `npm run bench *`, `npm run check:ipc *`, `npm run app:build *`). Uprawnienia w `.claude/settings.json` zmienia człowiek, bo agent nie rozszerza sobie uprawnień sam. Nie dodajemy ogólnego `npm run tauri *`, bo obejmowałby `tauri add`, czyli instalację pakietów z pominięciem reguł `ask`.
 
 ## Wydajność: gdzie są budżety
 
