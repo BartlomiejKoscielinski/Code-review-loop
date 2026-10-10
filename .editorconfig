@@ -1,0 +1,25 @@
+# Formatting basics only. Analyzer and code-style rules are set during planning.
+root = true
+
+[*]
+charset = utf-8
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,json,jsonc,yml,yaml,css,scss,html}]
+indent_size = 2
+
+[*.{csproj,props,targets,xml}]
+indent_size = 2
+
+[*.md]
+indent_size = 2
+trim_trailing_whitespace = false
+
+[*.{mjs,cjs,js,sh}]
+end_of_line = lf
+
+[*.{cmd,bat,sln}]
+end_of_line = crlf
