@@ -1,14 +1,17 @@
 //! Read-only access to a Git repository: resolving revisions, merge bases,
 //! the list of changed files between two commits and blob contents.
 //!
-//! Object reading goes through `gix`. Working tree status and network
-//! operations use the `git` CLI (spike S2) and live in other modules.
+//! Object reading goes through `gix`. Local changes ([`WorkTree`]) and network
+//! operations use the `git` CLI (ADR 0005).
 
 use std::path::Path;
+
+mod worktree;
 
 pub use gix::ObjectId;
 use gix::object::tree::diff::ChangeDetached;
 use gix::objs::tree::EntryMode;
+pub use worktree::WorkTree;
 
 /// Errors from reading a repository. Messages name the revision or object,
 /// never credentials (this crate does not handle any).
@@ -39,6 +42,10 @@ pub enum GitError {
     },
     #[error("object {id} is not a file (blob)")]
     NotABlob { id: ObjectId },
+    /// A `git` command failed; `detail` is its error output (local commands
+    /// only, which never see credentials).
+    #[error("git {command} failed: {detail}")]
+    Command { command: String, detail: String },
     #[error("cannot read object {id}")]
     Object {
         id: ObjectId,

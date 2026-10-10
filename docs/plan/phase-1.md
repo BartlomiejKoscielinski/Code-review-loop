@@ -87,10 +87,10 @@ Format każdego zadania: zależności, zakres, kryteria akceptacji (co uruchomi�
 - **Kryteria akceptacji:** `cargo test -p lupa-git` obejmuje: dodanie, usunięcie, zmianę nazwy z edycją, plik binarny, zmianę trybu pliku, CRLF, submoduł (pokazany jako zmiana wskaźnika), nazwę pliku z polskimi znakami i spacją. Wyniki są identyczne z `git diff --name-status -M` na tych samych repozytoriach.
 - **Rozmiar:** ~380 LOC.
 
-#### P1-07 · Migawka working tree
+#### P1-07 · Migawka working tree ✅
 
 - **Zależy od:** P1-06
-- **Zakres:** zmiany staged, unstaged i nieśledzone względem wybranej bazy, z respektowaniem `.gitignore`. Według S2: status z `git status --porcelain=v2 -z`, identyfikatory treści z `git hash-object --stdin-paths` bez `-w` (bez zapisu do repo dewelopera), więc filtry, `core.autocrlf` i `.gitattributes` działają tak jak w Gicie. Identyfikator treści jest kluczem cache bez commita. Normalizacja końców linii zgodna z `core.autocrlf` i `.gitattributes`.
+- **Zakres:** zmiany staged, unstaged i nieśledzone względem wybranej bazy, z respektowaniem `.gitignore`. Zrealizowane: zmiany śledzonych plików z `git diff --raw -M <base>`, nieśledzone z `git ls-files --others --exclude-standard`, a treść nowej strony przez `git hash-object -w --stdin-paths` do osobnego magazynu obiektów w cache Lupy (`GIT_OBJECT_DIRECTORY`, repo dewelopera przez alternates). Bloby są więc po filtrach Gita (CRLF, LFS), a do repo dewelopera nic nie jest zapisywane. Identyfikator treści jest kluczem cache bez commita. Normalizacja końców linii zgodna z `core.autocrlf` i `.gitattributes`.
 - **Kryteria akceptacji:** testy: identyfikator pliku równy wynikowi `git hash-object`; plik ignorowany nie pojawia się; plik z CRLF w working tree i LF w indeksie przy `autocrlf=true` nie jest zmieniony; usunięty, ale nie zestage'owany plik jest widoczny jako usunięty.
 - **Rozmiar:** ~300 LOC.
 
