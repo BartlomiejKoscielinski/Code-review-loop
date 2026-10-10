@@ -96,8 +96,8 @@ Reguły repo wymagają, żeby każda nowa zależność wynikała z planu. Poniż
 | Moduł | Kandydaci | Zadanie |
 | --- | --- | --- |
 | powłoka | `tauri` 2, `tauri-build` 2, `@tauri-apps/cli` (P1-01); `@tauri-apps/api` (P1-03) | P1-01, P1-03 |
-| Git | [`gix`](https://github.com/GitoxideLabs/gitoxide/blob/main/crate-status.md); [`git2`](https://crates.io/crates/git2) (wymaga libgit2) jako zapas po spike'u S2 | P1-06 |
-| diff | histogram z [`imara-diff`](https://github.com/pascalkuthe/imara-diff); `gix` ma własną kopię `gix-imara-diff`, więc S2 rozstrzyga, której używamy | P1-08 |
+| Git | [`gix`](https://github.com/GitoxideLabs/gitoxide/blob/main/crate-status.md) do odczytu obiektów i drzew; `git` CLI dla working tree, fetch i worktree (spike S2) | P1-06, P1-07 |
+| diff | [`imara-diff`](https://github.com/pascalkuthe/imara-diff) 0.2 bezpośrednio: histogram + `postprocess_lines`, zgodność zakresów z Gitem 100% na 500 parach i 99,7% na 1000 (spike S2) | P1-08 |
 | składnia | `tree-sitter`, gramatyki C# i XML | P1-22 |
 | SQLite | `rusqlite` z migracjami w kodzie | P1-04 |
 | sekrety | [`keyring`](https://crates.io/crates/keyring) 4.x (Credential Manager przez `windows-native-keyring-store`) | P1-14a |

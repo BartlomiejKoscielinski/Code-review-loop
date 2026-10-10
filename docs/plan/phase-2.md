@@ -191,8 +191,8 @@
 #### P2-15 · Pozycja komentarza GitLaba
 
 - **Zależy od:** P1-15, P1-26
-- **Zakres:** funkcja w `lupa-gitlab` licząca `position` z `diff_refs` (`base_sha`, `start_sha`, `head_sha`), ścieżek i `old_line`/`new_line` oraz `line_range` dla zakresu. Kotwiczenie komentarzy to według `docs/input/plan.md` najczęstsze źródło błędów, dlatego zadanie ma wyłącznie logikę i testy.
-- **Kryteria akceptacji:** testy tablicowe: linia dodana, usunięta, kontekst, zakres przez dodane i kontekstowe, plik ze zmianą nazwy, plik usunięty, pierwszy i ostatni wiersz pliku, plik bez końcowego nowego wiersza; wartości pól zgodne z dokumentacją Draft Notes API dla każdego przypadku.
+- **Zakres:** funkcja w `lupa-gitlab` licząca `position` z `diff_refs` (`base_sha`, `start_sha`, `head_sha`), ścieżek i `old_line`/`new_line` oraz `line_range` dla zakresu. Kotwiczenie komentarzy to według `docs/input/plan.md` najczęstsze źródło błędów, dlatego zadanie ma wyłącznie logikę i testy. Spike S2 pokazał, że w ok. 0,3% plików nasz diff może przesunąć blok zmian o linię względem Gita („ślizgacz”). Dlatego przed wysłaniem draftu pozycja jest sprawdzana z diffem wersji MR z API, a przy rozbieżności wygrywa pozycja GitLaba.
+- **Kryteria akceptacji:** test: przy rozbieżności ślizgacza (linia usunięta u nas, kontekst w diffie GitLaba) draft dostaje pozycję z diffu GitLaba; testy tablicowe: linia dodana, usunięta, kontekst, zakres przez dodane i kontekstowe, plik ze zmianą nazwy, plik usunięty, pierwszy i ostatni wiersz pliku, plik bez końcowego nowego wiersza; wartości pól zgodne z dokumentacją Draft Notes API dla każdego przypadku.
 - **Rozmiar:** ~300 LOC.
 
 #### P2-16 · Edytor komentarza i drafty lokalne

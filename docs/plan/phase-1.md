@@ -13,7 +13,7 @@ Spike'i nie są fazą 0. To krótkie eksperymenty, które Claude wykonuje sam pr
 | ID | Nazwa | Pytanie | Kryterium sukcesu | Limit | Odblokowuje |
 | --- | --- | --- | --- | --- | --- |
 | S1 | `codemirror-merge-external-diff` | Czy `@codemirror/merge` przyjmie hunki policzone w Ruście, czy budujemy widok z dwóch `EditorView` i własnych dekoracji? Ile fps daje plik 10 000 linii w WebView2? Jak mierzyć prawdziwą aplikację Tauri na Windows (start do pierwszego ekranu, fps w WebView2), skoro Playwright na buildzie Vite tego nie obejmuje? Narzędzia pomiaru są **NIEZWERYFIKOWANE** i ustala je spike. Czy CodeMirror działa przy produkcyjnym CSP (`style-src 'self'`, bez `'unsafe-inline'`)? Sprawdzamy na buildzie produkcyjnym, bo `devCsp` dopuszcza style inline. | widok obok siebie z hunkami z zewnątrz pokazuje te same linie co `git diff --histogram`; przewijanie ≥ 55 fps p95 na maszynie referencyjnej; powtarzalny pomiar startu aplikacji (rozrzut < 10% w 5 przebiegach) | 8 h | ADR widoku diffa, P1-18a, P1-28 |
-| S2 | `gix-diff-parity` | Czy `gix` z `imara-diff` (histogram) daje hunki identyczne z `git diff --histogram` i jak szybko liczy największy MR z repo MAUI? Czy `gix` obsługuje status working tree z `core.autocrlf`, `.gitattributes` i filtrami (np. LFS) zgodnie z `git status`? | 100% zgodności na 200 losowych parach plików; lista plików największego MR z ostatnich 6 miesięcy < 150 ms z ciepłego cache; status working tree zgodny z `git status --porcelain` na 5 przypadkach z CRLF i LFS, a jeśli nie, decyzja o `git` CLI dla working tree | 8 h | ADR biblioteki Git, P1-06, P1-08 |
+| S2 ✅ | [`gix-diff-parity`](../../spikes/gix-diff-parity/README.md) | Czy `gix` z `imara-diff` (histogram) daje hunki identyczne z `git diff --histogram` i jak szybko liczy największy MR z repo MAUI? Czy `gix` obsługuje status working tree z `core.autocrlf`, `.gitattributes` i filtrami (np. LFS) zgodnie z `git status`? | 100% zgodności na 200 losowych parach plików; lista plików największego MR z ostatnich 6 miesięcy < 150 ms z ciepłego cache; status working tree zgodny z `git status --porcelain` na 5 przypadkach z CRLF i LFS, a jeśli nie, decyzja o `git` CLI dla working tree | 8 h | ADR biblioteki Git, P1-06, P1-08 |
 
 
 ## Kamienie milowe
@@ -83,22 +83,22 @@ Format każdego zadania: zależności, zakres, kryteria akceptacji (co uruchomi�
 #### P1-06 · Odczyt repozytorium
 
 - **Zależy od:** P1-01, S2
-- **Zakres:** `lupa-git`: rozwiązywanie refów i SHA, `merge-base`, lista zmienionych plików między dwoma drzewami z wykrywaniem zmian nazw, odczyt blobów. `lupa-testkit`: budowanie repozytoriów testowych przez `git` CLI w katalogu tymczasowym.
+- **Zakres:** `lupa-git` na `gix` (wynik S2, `git2` niepotrzebny): rozwiązywanie refów i SHA, `merge-base`, lista zmienionych plików między dwoma drzewami z wykrywaniem zmian nazw, odczyt blobów. `lupa-testkit`: budowanie repozytoriów testowych przez `git` CLI w katalogu tymczasowym.
 - **Kryteria akceptacji:** `cargo test -p lupa-git` obejmuje: dodanie, usunięcie, zmianę nazwy z edycją, plik binarny, zmianę trybu pliku, CRLF, submoduł (pokazany jako zmiana wskaźnika), nazwę pliku z polskimi znakami i spacją. Wyniki są identyczne z `git diff --name-status -M` na tych samych repozytoriach.
 - **Rozmiar:** ~380 LOC.
 
 #### P1-07 · Migawka working tree
 
 - **Zależy od:** P1-06
-- **Zakres:** zmiany staged, unstaged i nieśledzone względem wybranej bazy, z respektowaniem `.gitignore`. Identyfikator treści liczony jak `git hash-object` (klucz cache bez commita). Normalizacja końców linii zgodna z `core.autocrlf` i `.gitattributes`.
+- **Zakres:** zmiany staged, unstaged i nieśledzone względem wybranej bazy, z respektowaniem `.gitignore`. Według S2: status z `git status --porcelain=v2 -z`, identyfikatory treści z `git hash-object --stdin-paths` bez `-w` (bez zapisu do repo dewelopera), więc filtry, `core.autocrlf` i `.gitattributes` działają tak jak w Gicie. Identyfikator treści jest kluczem cache bez commita. Normalizacja końców linii zgodna z `core.autocrlf` i `.gitattributes`.
 - **Kryteria akceptacji:** testy: identyfikator pliku równy wynikowi `git hash-object`; plik ignorowany nie pojawia się; plik z CRLF w working tree i LF w indeksie przy `autocrlf=true` nie jest zmieniony; usunięty, ale nie zestage'owany plik jest widoczny jako usunięty.
 - **Rozmiar:** ~300 LOC.
 
 #### P1-08 · Diff linii
 
 - **Zależy od:** P1-06, S2
-- **Zakres:** `lupa-diff`: histogram przez `imara-diff`, hunki z konfigurowalnym kontekstem, opcja ignorowania białych znaków na początku linii („Ignoruj wcięcia” z makiety `Main`).
-- **Kryteria akceptacji:** test zgodności: na 200 parach plików z `lupa-testkit` (losowane z ustalonym ziarnem) hunki są identyczne z `git diff --histogram -U3`, a z ignorowaniem wcięć zgodne z `git diff --histogram --ignore-space-change` w zakresie opisanym w teście.
+- **Zakres:** `lupa-diff`: histogram przez `imara-diff` 0.2 (`Algorithm::Histogram` + `postprocess_lines`, wynik S2), bez jego drukarki unified, która przy hunkach blisko początku pliku dodaje linię kontekstu za dużo. Hunki z kontekstem liczy `lupa-diff`, hunki z konfigurowalnym kontekstem, opcja ignorowania białych znaków na początku linii („Ignoruj wcięcia” z makiety `Main`).
+- **Kryteria akceptacji:** test zgodności: na 200 parach plików z `lupa-testkit` (losowane z ustalonym ziarnem) zakresy zmian są identyczne z `git diff --histogram -U0`, a hunki z kontekstem z `-U3`; przypadek z hunkiem w pierwszych 3 liniach pliku jest w zestawie, a z ignorowaniem wcięć zgodne z `git diff --histogram --ignore-space-change` w zakresie opisanym w teście.
 - **Rozmiar:** ~300 LOC.
 
 #### P1-09 · Diff słów w hunku

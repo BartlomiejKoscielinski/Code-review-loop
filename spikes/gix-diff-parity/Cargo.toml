@@ -1,0 +1,12 @@
+[package]
+name = "gix-diff-parity"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Standalone spike: not part of the Lupa workspace.
+[workspace]
+
+[dependencies]
+gix = { version = "0.89", default-features = false, features = ["blob-diff", "revision", "sha1"] }
+imara-diff = "0.2"
