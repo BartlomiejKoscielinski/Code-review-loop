@@ -1,9 +1,6 @@
-/// Starts the Lupa window. Exits with code 1 when Tauri cannot start.
-pub fn run() {
-    if let Err(error) = tauri::Builder::default().run(tauri::generate_context!()) {
-        eprintln!("Lupa failed to start: {error}");
-        std::process::exit(1);
-    }
+/// Starts the Lupa window and blocks until it is closed.
+pub fn run() -> tauri::Result<()> {
+    tauri::Builder::default().run(tauri::generate_context!())
 }
 
 #[cfg(test)]
@@ -12,37 +9,66 @@ mod tests {
 
     const CONFIG: &str = include_str!("../tauri.conf.json");
 
-    /// Sources the production webview may load from. Untrusted MR content is
-    /// rendered in this webview, so anything remote must stay out of the CSP.
-    const ALLOWED_SOURCES: &[&str] = &["'self'", "'none'", "data:", "ipc:", "http://ipc.localhost"];
+    /// Sources each directive of the production CSP may use. The webview shows
+    /// untrusted MR content, so nothing remote and nothing inline is allowed,
+    /// and `data:` and IPC sources stay in the one directive that needs them.
+    const ALLOWED: &[(&str, &[&str])] = &[
+        ("default-src", &["'self'"]),
+        ("script-src", &["'self'"]),
+        ("style-src", &["'self'"]),
+        ("img-src", &["'self'", "data:"]),
+        ("font-src", &["'self'"]),
+        ("connect-src", &["ipc:", "http://ipc.localhost"]),
+        ("object-src", &["'none'"]),
+        ("base-uri", &["'self'"]),
+        ("form-action", &["'none'"]),
+        ("frame-ancestors", &["'none'"]),
+    ];
 
-    fn production_csp() -> String {
+    fn security() -> Value {
         let config: Value = serde_json::from_str(CONFIG).unwrap();
-        config["app"]["security"]["csp"]
-            .as_str()
-            .unwrap()
-            .to_owned()
+        config["app"]["security"].clone()
     }
 
     #[test]
-    fn production_csp_allows_only_local_sources() {
-        let csp = production_csp();
+    fn production_csp_uses_only_allowed_sources_per_directive() {
+        let security = security();
+        let csp = security["csp"].as_str().unwrap();
         let directives: Vec<&str> = csp
             .split(';')
             .map(str::trim)
             .filter(|d| !d.is_empty())
             .collect();
         assert!(
-            directives.contains(&"default-src 'self'"),
-            "missing default-src 'self' in {csp}"
+            directives.iter().any(|d| d.starts_with("default-src ")),
+            "missing default-src in {csp}"
         );
         for directive in directives {
-            for source in directive.split_whitespace().skip(1) {
+            let mut parts = directive.split_whitespace();
+            let name = parts.next().unwrap();
+            let allowed = ALLOWED
+                .iter()
+                .find(|(known, _)| *known == name)
+                .map(|(_, sources)| *sources)
+                .unwrap_or_else(|| panic!("directive {name} has no allow list in this test"));
+            for source in parts {
                 assert!(
-                    ALLOWED_SOURCES.contains(&source),
-                    "source {source} in directive `{directive}` is not local"
+                    allowed.contains(&source),
+                    "source {source} is not allowed in `{directive}`"
                 );
             }
         }
+    }
+
+    #[test]
+    fn asset_csp_and_asset_protocol_stay_disabled() {
+        let security = security();
+        assert!(
+            security
+                .get("dangerousDisableAssetCspModification")
+                .is_none(),
+            "Tauri must keep adding CSP nonces and hashes to assets"
+        );
+        assert_ne!(security["assetProtocol"]["enable"], Value::Bool(true));
     }
 }

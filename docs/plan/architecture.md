@@ -94,21 +94,22 @@ Reguły repo wymagają, żeby każda nowa zależność wynikała z planu. Poniż
 
 | Moduł | Kandydaci | Zadanie |
 | --- | --- | --- |
-| powłoka | `tauri` 2, `@tauri-apps/api`, `@tauri-apps/cli` | P1-01 |
+| powłoka | `tauri` 2, `tauri-build` 2, `@tauri-apps/cli` (P1-01); `@tauri-apps/api` (P1-03) | P1-01, P1-03 |
 | Git | [`gix`](https://github.com/GitoxideLabs/gitoxide/blob/main/crate-status.md); [`git2`](https://crates.io/crates/git2) (wymaga libgit2) jako zapas po spike'u S2 | P1-06 |
 | diff | histogram z [`imara-diff`](https://github.com/pascalkuthe/imara-diff); `gix` ma własną kopię `gix-imara-diff`, więc S2 rozstrzyga, której używamy | P1-08 |
 | składnia | `tree-sitter`, gramatyki C# i XML | P1-22 |
 | SQLite | `rusqlite` z migracjami w kodzie | P1-04 |
 | sekrety | [`keyring`](https://crates.io/crates/keyring) 4.x (Credential Manager przez `windows-native-keyring-store`) | P1-14a |
 | HTTP | `reqwest` (rustls, firmowe CA dodawane, nie wyłączane) | P1-14b |
-| async, serializacja, błędy | `tokio`, `serde`, `serde_json`, `thiserror` | P1-01 |
+| async, serializacja, błędy | `tokio`, `serde`, `serde_json`, `thiserror` | P1-03 (`serde_json` jako dev-dependency już w P1-01) |
 | typy IPC | `specta` z `tauri-specta` albo `ts-rs` | P1-03 |
 | testy Rust | atrapa HTTP (`wiremock` albo `httpmock`), `tempfile`, `insta` | P1-06, P1-14b |
 | YAML | parser YAML dla `.review/` wybrany w zadaniu (`serde_yaml` nie jest już rozwijany) | P2-04 |
 | UI | `react`, `react-dom`, `vite`, `@codemirror/*`, `@codemirror/merge`, wirtualizacja listy (`@tanstack/react-virtual`) | P1-17a, P1-18a, P1-21 |
 | walidacja na granicy | `zod` | P1-03 |
 | Markdown bez HTML | `react-markdown` bez wtyczek przepuszczających surowy HTML | P1-27 |
-| testy TS | `vitest`, `@testing-library/react`, `@playwright/test` | P1-01, P1-28 |
+| testy TS | `vitest`, `jsdom`, `@testing-library/react`, `@testing-library/jest-dom` (P1-01); `@playwright/test` (P1-17b, P1-28) | P1-01, P1-28 |
+| narzędzia TS | `typescript` 6.0 (typescript-eslint 8 nie wspiera jeszcze 7.x), `@vitejs/plugin-react`, `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-plugin-react-hooks`, `globals`, `prettier` | P1-01 |
 | .NET | `Microsoft.CodeAnalysis.CSharp.Workspaces`, `Microsoft.CodeAnalysis.Workspaces.MSBuild`, `Microsoft.Build.Locator`, xUnit | P3-11 |
 
 Stan wiedzy o `serde_yaml` (repozytorium zarchiwizowane przez autora) jest **NIEZWERYFIKOWANY** w dokumentacji. Zadanie P2-04 sprawdza go przed wyborem parsera.

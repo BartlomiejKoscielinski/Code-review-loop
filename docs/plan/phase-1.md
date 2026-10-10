@@ -12,7 +12,7 @@ Spike'i nie są fazą 0. To krótkie eksperymenty, które Claude wykonuje sam pr
 
 | ID | Nazwa | Pytanie | Kryterium sukcesu | Limit | Odblokowuje |
 | --- | --- | --- | --- | --- | --- |
-| S1 | `codemirror-merge-external-diff` | Czy `@codemirror/merge` przyjmie hunki policzone w Ruście, czy budujemy widok z dwóch `EditorView` i własnych dekoracji? Ile fps daje plik 10 000 linii w WebView2? Jak mierzyć prawdziwą aplikację Tauri na Windows (start do pierwszego ekranu, fps w WebView2), skoro Playwright na buildzie Vite tego nie obejmuje? Narzędzia pomiaru są **NIEZWERYFIKOWANE** i ustala je spike. | widok obok siebie z hunkami z zewnątrz pokazuje te same linie co `git diff --histogram`; przewijanie ≥ 55 fps p95 na maszynie referencyjnej; powtarzalny pomiar startu aplikacji (rozrzut < 10% w 5 przebiegach) | 8 h | ADR widoku diffa, P1-18a, P1-28 |
+| S1 | `codemirror-merge-external-diff` | Czy `@codemirror/merge` przyjmie hunki policzone w Ruście, czy budujemy widok z dwóch `EditorView` i własnych dekoracji? Ile fps daje plik 10 000 linii w WebView2? Jak mierzyć prawdziwą aplikację Tauri na Windows (start do pierwszego ekranu, fps w WebView2), skoro Playwright na buildzie Vite tego nie obejmuje? Narzędzia pomiaru są **NIEZWERYFIKOWANE** i ustala je spike. Czy CodeMirror działa przy produkcyjnym CSP (`style-src 'self'`, bez `'unsafe-inline'`)? Sprawdzamy na buildzie produkcyjnym, bo `devCsp` dopuszcza style inline. | widok obok siebie z hunkami z zewnątrz pokazuje te same linie co `git diff --histogram`; przewijanie ≥ 55 fps p95 na maszynie referencyjnej; powtarzalny pomiar startu aplikacji (rozrzut < 10% w 5 przebiegach) | 8 h | ADR widoku diffa, P1-18a, P1-28 |
 | S2 | `gix-diff-parity` | Czy `gix` z `imara-diff` (histogram) daje hunki identyczne z `git diff --histogram` i jak szybko liczy największy MR z repo MAUI? Czy `gix` obsługuje status working tree z `core.autocrlf`, `.gitattributes` i filtrami (np. LFS) zgodnie z `git status`? | 100% zgodności na 200 losowych parach plików; lista plików największego MR z ostatnich 6 miesięcy < 150 ms z ciepłego cache; status working tree zgodny z `git status --porcelain` na 5 przypadkach z CRLF i LFS, a jeśli nie, decyzja o `git` CLI dla working tree | 8 h | ADR biblioteki Git, P1-06, P1-08 |
 
 
@@ -32,7 +32,7 @@ Format każdego zadania: zależności, zakres, kryteria akceptacji (co uruchomi�
 
 ### 1.0 Fundament
 
-#### P1-01 · Szkielet monorepo i aplikacji Tauri ✅
+#### P1-01 · Szkielet monorepo i aplikacji Tauri ✅ (instalator Windows potwierdzi CI z P1-02)
 
 - **Zależy od:** —
 - **Zakres:** Cargo workspace z `app/src-tauri`. npm workspaces z `app`. Puste `crates/lupa-testkit` i `packages/domain` powstają w pierwszych zadaniach, które ich potrzebują (P1-06 i P1-24), żeby nie commitować pustych modułów. Dalej: Vite + React + TypeScript `strict`, ESLint, Prettier, Vitest. Okno Tauri 2 z ekranem „Lupa” i restrykcyjnym CSP. Komendy z `architecture.md` w `package.json` i w sekcji „Komendy” w `CLAUDE.md`. Propozycja wzorców do `allow` w opisie zmiany. Wpisuje je człowiek, agent nie zmienia własnych uprawnień.
@@ -47,7 +47,7 @@ Format każdego zadania: zależności, zakres, kryteria akceptacji (co uruchomi�
 
 - **Zależy od:** P1-01
 - **Zakres:** repo Lupy jest na GitHubie (`README.md`, „Mapa repo”), więc workflow GitHub Actions na hostowanym runnerze Windows (D8 w `decisions.md`): format, clippy, testy Rust, lint, typecheck, testy TS, testy hooków. Cache zależności. Bez sekretów.
-- **Kryteria akceptacji:** workflow przechodzi na PR z tej zmiany; celowo zepsuty test (w osobnym commicie testowym, potem cofniętym) daje czerwony status.
+- **Kryteria akceptacji:** workflow przechodzi na PR z tej zmiany i buduje instalator NSIS (`npm run app:build`), co zamyka ostatnie kryterium P1-01; celowo zepsuty test (w osobnym commicie testowym, potem cofniętym) daje czerwony status.
 - **Rozmiar:** ~120 LOC.
 
 #### P1-03 · Kontrakt IPC
