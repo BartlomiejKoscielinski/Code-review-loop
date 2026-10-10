@@ -1,0 +1,19 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-10-10T08:40:00Z"},
+  "title": "Guided Code Review — makiety UI",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 3040, "y": 0, "w": 1440, "h": 1200, "title": "3 · Trasa (główny widok)", "expand": "fill", "is_interactive": true},
+    "Inbox.dc.html": {"x": 0, "y": 0, "w": 1440, "h": 900, "title": "1 · Skrzynka", "expand": "fill", "is_interactive": true},
+    "Briefing.dc.html": {"x": 1520, "y": 0, "w": 1440, "h": 1000, "title": "2 · Briefing", "expand": "fill", "is_interactive": true},
+    "Gate.dc.html": {"x": 4560, "y": 0, "w": 1440, "h": 1000, "title": "4 · Bramka i publikacja", "expand": "fill", "is_interactive": true},
+    "Interdiff.dc.html": {"x": 6080, "y": 0, "w": 1440, "h": 1100, "title": "5 · Interdiff po nowym pushu", "expand": "fill", "is_interactive": true}
+  },
+  "order": ["Main.dc.html", "Inbox.dc.html", "Briefing.dc.html", "Gate.dc.html", "Interdiff.dc.html"],
+  "notes": {
+    "flow": {"x": 0, "y": -300, "text": "Lupa · przepływ recenzenta: skrzynka → briefing → trasa → bramka → interdiff", "kind": "title1", "maxW": 7520}
+  },
+  "designSystems": []
+}
