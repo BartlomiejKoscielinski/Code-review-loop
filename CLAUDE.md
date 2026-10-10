@@ -4,7 +4,7 @@
 
 Lupa (nazwa robocza) to lokalna aplikacja desktop do prowadzonego code review merge requestów z GitLaba self-managed. Rdzeń działa w Tauri 2 (Rust), interfejs w React + TypeScript z CodeMirror 6, a analizę kodu C# robi sidecar .NET z Roslyn. Asystentem jest Claude Code wywoływany przez `claude -p`, wyłącznie w trybie tylko do odczytu.
 
-**Faza: 0, planowanie.** Repo nie zawiera kodu aplikacji. Struktura katalogów, biblioteki i komendy zostaną ustalone w sesji planowania. Nie twórz kodu aplikacji ani szkieletu Tauri lub .NET bez zadania w `docs/plan/`.
+**Faza: 1, czytnik zmian.** Plan jest w `docs/plan/` (start: `docs/plan/README.md`), architektura w `docs/plan/architecture.md`, decyzje domyślne w `docs/plan/decisions.md`. Kod powstaje zadanie po zadaniu według planu.
 
 ## Mapa repo i źródła prawdy
 
@@ -39,13 +39,19 @@ Przy konflikcie źródeł obowiązuje kolejność: `docs/input/`, zaakceptowane 
 
 ## Komendy
 
-Na dziś repo nie ma komend build, test ani lint dla Rusta, TypeScriptu i .NET, bo nie ma jeszcze kodu. Sesja planowania ustali je i wpisze tutaj oraz do listy `allow` w `.claude/settings.json`. Do tego czasu nie zgaduj komend projektu.
+Uruchamiane z katalogu głównego repo. Zależności instaluje `npm install` (raz, za zgodą człowieka).
 
-Jedyna działająca komenda testów dotyczy hooków Claude Code:
+| Co | Komenda |
+| --- | --- |
+| Rust: build, testy | `cargo build --workspace`, `cargo test --workspace` |
+| Rust: format, lint | `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings` |
+| TS: testy, typy | `npm test`, `npm run typecheck` |
+| TS: lint, format | `npm run lint`, `npm run format:check` |
+| UI: build | `npm run build` |
+| Aplikacja: uruchomienie, instalator | `npm run app:dev`, `npm run app:build` (bez instalatora: `npm run app:build -- --no-bundle`) |
+| Hooki Claude Code | `node --test .claude/hooks/hooks.test.mjs` |
 
-```
-node --test .claude/hooks/hooks.test.mjs
-```
+Komendy .NET dojdą z sidecarem (P3-11). Kolejne komendy dopisuje zadanie, które je wprowadza.
 
 ## Środowisko
 

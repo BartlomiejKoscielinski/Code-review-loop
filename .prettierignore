@@ -1,0 +1,9 @@
+docs/
+spikes/
+.claude/
+target/
+dist/
+package-lock.json
+app/src-tauri/gen/
+app/src-tauri/icons/
+*.md

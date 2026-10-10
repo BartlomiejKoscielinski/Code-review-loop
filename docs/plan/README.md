@@ -53,7 +53,7 @@ Strumienie bez wzajemnych zależności (np. P1-17a powłoka UI i P1-06 Git, P2-3
 
 | Faza | Status | Uwagi |
 | --- | --- | --- |
-| 1 | w toku | P1-01 w pracy, potem spike'i S1 i S2 |
+| 1 | w toku | P1-01 gotowe; dalej P1-02 (CI), P1-03 (IPC) i spike'i S1, S2 |
 | 2 | do zrobienia | P2-30 może zacząć się wcześniej, bo nie zależy od kodu |
 | 3 | do zrobienia | przed P3-01 warto potwierdzić D2 z `decisions.md` |
 | 4 | do zrobienia | — |

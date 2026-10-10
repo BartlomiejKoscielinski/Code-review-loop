@@ -32,10 +32,10 @@ Format każdego zadania: zależności, zakres, kryteria akceptacji (co uruchomi�
 
 ### 1.0 Fundament
 
-#### P1-01 · Szkielet monorepo i aplikacji Tauri
+#### P1-01 · Szkielet monorepo i aplikacji Tauri ✅
 
 - **Zależy od:** —
-- **Zakres:** Cargo workspace z `app/src-tauri` i pustym `crates/lupa-testkit`. npm workspaces z `app` i `packages/domain`, Vite + React + TypeScript `strict`, ESLint, Prettier, Vitest. Okno Tauri 2 z ekranem „Lupa” i restrykcyjnym CSP. Komendy z `architecture.md` w `package.json` i w sekcji „Komendy” w `CLAUDE.md`. Propozycja wzorców do `allow` w opisie zmiany. Wpisuje je człowiek, agent nie zmienia własnych uprawnień.
+- **Zakres:** Cargo workspace z `app/src-tauri`. npm workspaces z `app`. Puste `crates/lupa-testkit` i `packages/domain` powstają w pierwszych zadaniach, które ich potrzebują (P1-06 i P1-24), żeby nie commitować pustych modułów. Dalej: Vite + React + TypeScript `strict`, ESLint, Prettier, Vitest. Okno Tauri 2 z ekranem „Lupa” i restrykcyjnym CSP. Komendy z `architecture.md` w `package.json` i w sekcji „Komendy” w `CLAUDE.md`. Propozycja wzorców do `allow` w opisie zmiany. Wpisuje je człowiek, agent nie zmienia własnych uprawnień.
 - **Kryteria akceptacji:**
   - `cargo build --workspace`, `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `npm run build`, `npm test`, `npm run lint`, `npm run typecheck` kończą się kodem 0;
   - `npm run app:build` na Windows tworzy instalator, a aplikacja po instalacji pokazuje ekran „Lupa”;
