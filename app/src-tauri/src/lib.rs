@@ -1,15 +1,41 @@
+pub mod command_names;
 pub mod commands;
 pub mod ipc;
+pub mod navigation;
+
+use tauri::webview::NewWindowResponse;
+use tauri::{AppHandle, WebviewWindowBuilder};
 
 /// Starts the Lupa window and blocks until it is closed.
 pub fn run() -> tauri::Result<()> {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![commands::app_info])
+        .setup(|app| create_main_window(app.handle()))
         .run(tauri::generate_context!())
+}
+
+/// Creates the main window from `tauri.conf.json` (where it has
+/// `"create": false`), adding the navigation guard and blocking new windows.
+fn create_main_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    let config = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|window| window.label == "main")
+        .ok_or("tauri.conf.json has no window labelled main")?
+        .clone();
+    WebviewWindowBuilder::from_config(app, &config)?
+        .on_navigation(|url| navigation::is_app_url(url, cfg!(dev)))
+        .on_new_window(|_, _| NewWindowResponse::Deny)
+        .build()?;
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use serde_json::Value;
 
     const CONFIG: &str = include_str!("../tauri.conf.json");
@@ -78,28 +104,49 @@ mod tests {
     }
 
     #[test]
-    fn capabilities_grant_only_app_commands_to_the_main_window() {
+    fn capabilities_grant_exactly_the_app_commands_to_the_main_window() {
+        assert!(
+            security().get("capabilities").is_none(),
+            "inline capabilities in tauri.conf.json bypass the files checked below"
+        );
+        let expected: BTreeSet<String> = crate::command_names::COMMANDS
+            .iter()
+            .map(|command| format!("allow-{}", command.replace('_', "-")))
+            .collect();
+        assert!(
+            !expected.is_empty(),
+            "an empty command list disables the app ACL"
+        );
+
         let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/capabilities");
-        let mut checked = 0;
+        let mut granted = BTreeSet::new();
         for entry in std::fs::read_dir(dir).unwrap() {
             let path = entry.unwrap().path();
-            let text = std::fs::read_to_string(&path).unwrap();
-            let capability: Value = serde_json::from_str(&text).unwrap();
-            let file = path.display();
-            assert!(
-                capability.get("remote").is_none(),
-                "{file} exposes IPC to remote URLs"
-            );
-            assert_eq!(capability["windows"], serde_json::json!(["main"]), "{file}");
-            for permission in capability["permissions"].as_array().unwrap() {
-                let name = permission.as_str().unwrap();
+            let file = path.display().to_string();
+            let capability: Value =
+                serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+            for key in ["remote", "webviews", "platforms"] {
                 assert!(
-                    name.starts_with("allow-") && !name.contains(':'),
-                    "{file}: permission {name} is not an app command permission"
+                    capability.get(key).is_none(),
+                    "{file}: `{key}` is not allowed"
                 );
             }
-            checked += 1;
+            assert_ne!(capability["local"], Value::Bool(false), "{file}");
+            assert_eq!(capability["windows"], serde_json::json!(["main"]), "{file}");
+            for permission in capability["permissions"].as_array().unwrap() {
+                granted.insert(permission.as_str().unwrap().to_owned());
+            }
         }
-        assert!(checked > 0, "no capability files in {dir}");
+        assert_eq!(granted, expected);
+    }
+
+    #[test]
+    fn main_window_is_created_in_code_with_the_navigation_guard() {
+        let config: Value = serde_json::from_str(CONFIG).unwrap();
+        let windows = config["app"]["windows"].as_array().unwrap();
+        assert_eq!(windows.len(), 1);
+        assert_eq!(windows[0]["label"], "main");
+        assert_eq!(windows[0]["create"], Value::Bool(false));
+        assert_eq!(security()["freezePrototype"], Value::Bool(true));
     }
 }

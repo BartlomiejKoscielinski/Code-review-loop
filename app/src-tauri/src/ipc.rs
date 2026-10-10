@@ -42,23 +42,72 @@ impl IpcError {
     }
 }
 
-/// Prefixes of GitLab token types (personal, OAuth, deploy, runner, CI job,
-/// trigger, feed, incoming mail, agent, SCIM, feature flags client).
+/// Prefixes of GitLab token types (personal, OAuth, deploy, runner, runner
+/// from registration token, CI job, trigger, feed, incoming mail, agent, SCIM,
+/// feature flags client, workspace). Instances may configure a custom PAT
+/// prefix, which only the exact-value removal from P1-14a catches.
 const TOKEN_PREFIXES: &[&str] = &[
-    "glpat-", "gloas-", "gldt-", "glrt-", "glcbt-", "glptt-", "glft-", "glimt-", "glagent-",
-    "glsoat-", "glffct-",
+    "glpat-", "gloas-", "gldt-", "glrt-", "glrtr-", "glcbt-", "glptt-", "glft-", "glimt-",
+    "glagent-", "glsoat-", "glffct-", "glwt-",
+];
+
+/// Lowercase markers after which a secret value follows: query and form
+/// parameters, GitLab token headers, `Authorization` and the session cookie.
+const SECRET_MARKERS: &[&str] = &[
+    "private_token=",
+    "access_token=",
+    "job_token=",
+    "_gitlab_session=",
+    "private-token:",
+    "job-token:",
+    "authorization: bearer ",
+    "authorization: basic ",
 ];
 
 const REDACTED: &str = "[REDACTED]";
 
 /// Replaces secrets that commonly leak into error text with `[REDACTED]`:
-/// GitLab-token-shaped substrings and the password part of `scheme://user:password@host`.
+/// GitLab-token-shaped substrings, values after token parameters and headers,
+/// and URL credentials (`scheme://user:password@host`, `scheme://token@host`).
 ///
 /// This is a safety net for messages built from external output (for example
 /// a `git` error that echoes a URL). Code must still never put the token into
 /// a message on purpose; P1-14a also removes the exact stored token value.
 pub fn redact_tokens(text: &str) -> String {
-    redact_url_passwords(&redact_prefixed_tokens(text))
+    redact_url_credentials(&redact_marked_values(&redact_prefixed_tokens(text)))
+}
+
+fn redact_marked_values(text: &str) -> String {
+    // ASCII lowercasing keeps byte offsets, so indices from `lower` are valid in `text`.
+    let lower = text.to_ascii_lowercase();
+    let mut out = String::with_capacity(text.len());
+    let mut copied_until = 0;
+    loop {
+        let next = SECRET_MARKERS
+            .iter()
+            .filter_map(|marker| {
+                lower[copied_until..]
+                    .find(marker)
+                    .map(|offset| (copied_until + offset, marker.len()))
+            })
+            .min();
+        let Some((start, marker_len)) = next else {
+            break;
+        };
+        let mut value_start = start + marker_len;
+        value_start +=
+            text[value_start..].len() - text[value_start..].trim_start_matches(' ').len();
+        let value_len = text[value_start..]
+            .find(|c: char| c.is_whitespace() || matches!(c, '&' | ';' | ',' | '"' | '\'' | ')'))
+            .unwrap_or(text.len() - value_start);
+        out.push_str(&text[copied_until..value_start]);
+        if value_len > 0 {
+            out.push_str(REDACTED);
+        }
+        copied_until = value_start + value_len;
+    }
+    out.push_str(&text[copied_until..]);
+    out
 }
 
 fn redact_prefixed_tokens(text: &str) -> String {
@@ -94,8 +143,10 @@ fn token_length(text: &str) -> usize {
         .unwrap_or(text.len())
 }
 
-/// `https://user:secret@host` becomes `https://user:[REDACTED]@host`.
-fn redact_url_passwords(text: &str) -> String {
+/// `https://user:secret@host` becomes `https://user:[REDACTED]@host` and
+/// `https://secret@host` becomes `https://[REDACTED]@host`. RFC 3986 requires
+/// `/` inside credentials to be percent-encoded, so `/` ends the authority.
+fn redact_url_credentials(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
     while let Some(scheme_end) = rest.find("://") {
@@ -109,6 +160,10 @@ fn redact_url_passwords(text: &str) -> String {
         match (authority.rfind('@'), authority.find(':')) {
             (Some(at), Some(colon)) if colon < at && at > colon + 1 => {
                 out.push_str(&authority[..=colon]);
+                out.push_str(REDACTED);
+                out.push_str(&authority[at..]);
+            }
+            (Some(at), colon) if at > 0 && colon.is_none_or(|colon| colon > at) => {
                 out.push_str(REDACTED);
                 out.push_str(&authority[at..]);
             }
@@ -146,6 +201,35 @@ mod tests {
         assert_eq!(
             redact_tokens(message),
             "fatal: unable to access 'https://bartek:[REDACTED]@gitlab.local/app.git/'"
+        );
+    }
+
+    #[test]
+    fn redacts_token_used_as_url_user_name() {
+        assert_eq!(
+            redact_tokens("clone https://s3cr3tvalue@gitlab.local/app.git failed"),
+            "clone https://[REDACTED]@gitlab.local/app.git failed"
+        );
+    }
+
+    #[test]
+    fn redacts_token_parameters_headers_and_session_cookie() {
+        let message = "GET /api/v4/projects?private_token=abc123&per_page=20 \
+            PRIVATE-TOKEN: def456 Authorization: Bearer ghi789 \
+            Cookie: _gitlab_session=jkl012; theme=dark job_token=mno345";
+        assert_eq!(
+            redact_tokens(message),
+            "GET /api/v4/projects?private_token=[REDACTED]&per_page=20 \
+            PRIVATE-TOKEN: [REDACTED] Authorization: Bearer [REDACTED] \
+            Cookie: _gitlab_session=[REDACTED]; theme=dark job_token=[REDACTED]"
+        );
+    }
+
+    #[test]
+    fn redacts_runner_and_workspace_tokens() {
+        assert_eq!(
+            redact_tokens("glrtr-aaa111 and glwt-bbb222"),
+            "[REDACTED] and [REDACTED]"
         );
     }
 
