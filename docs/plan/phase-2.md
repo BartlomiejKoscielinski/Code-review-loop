@@ -364,6 +364,7 @@ Różnica ostrzeżeń wymaga buildu base i head, czyli wykonania kodu z repozyto
 #### P2-31 · Kopia kodu per cel w katalogu cache
 
 - **Zależy od:** P1-04, P1-15, P2-30 (zaakceptowany ADR)
+- **Uwaga:** zmiany w MR liczymy z samych obiektów (`Repo::changed_files`). `WorkTree` (migawka przez `git add`) nie wolno używać na kodzie z MR (ADR 0007).
 - **Zakres:** kopia kodu base i head w katalogu cache narzędzia (nigdy w working copy dewelopera), metodą z ADR z P2-30. `git worktree add` z `docs/input/plan.md` współdzieli `.git` z repo dewelopera, więc kod z MR uruchomiony w worktree mógłby zapisać hooki lub `core.hooksPath` w repo dewelopera. ADR rozstrzyga między worktree z ochroną, osobnym klonem a eksportem drzewa (`git archive`). Dalej: z limitem liczby i miejsca, sprzątaniem (`worktree prune`) i blokadą równoległego użycia. Ścieżki krótkie (limit długości ścieżek Windows).
 - **Kryteria akceptacji:** testy: worktree powstaje wewnątrz katalogu cache także przy nazwach gałęzi z `..`, `/` i znakami spoza ASCII; po przekroczeniu limitu najstarszy worktree jest usuwany; usunięcie kopii nie dotyka repo dewelopera (test sprawdza `git status` repo źródłowego); skrypt w kopii, który próbuje zapisać `.git/hooks` i `.git/config`, nie zmienia repo dewelopera.
 - **Rozmiar:** ~250 LOC.

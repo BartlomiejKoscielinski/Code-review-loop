@@ -1,6 +1,6 @@
 # 0006. Lokalne zmiany przez migawkę na kopii indeksu
 
-- Status: Zaakceptowany (decyzja techniczna delegowana przez @Bartka w sesji 2026-10-10, `docs/plan/decisions.md`)
+- Status: Zaakceptowany; uzupełniony przez [0007](0007-snapshot-git-process-isolation.md)
 - Data: 2026-10-10
 - Decydenci: @Bartek
 
