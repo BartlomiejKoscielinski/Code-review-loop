@@ -1,43 +1,67 @@
-use lupa_git::{ChangeKind, ChangedFile, EntryKind, GitError, Repo};
+use lupa_git::{ChangeKind, ChangedFile, EntryKind, FileVersion, GitError, Repo};
 use lupa_testkit::TestRepo;
 
-/// Our changes in `git diff --name-status` form, rename scores dropped.
-fn name_status(files: &[ChangedFile]) -> Vec<String> {
+const ZERO: &str = "0000000000000000000000000000000000000000";
+
+fn mode(kind: EntryKind) -> &'static str {
+    match kind {
+        EntryKind::File => "100644",
+        EntryKind::Executable => "100755",
+        EntryKind::Symlink => "120000",
+        EntryKind::Submodule => "160000",
+    }
+}
+
+fn side(version: Option<&FileVersion>) -> (&'static str, String, &str) {
+    match version {
+        Some(v) => (mode(v.kind), v.id.to_string(), v.path.as_str()),
+        None => ("000000", ZERO.to_owned(), ""),
+    }
+}
+
+/// Our changes in `git diff --raw` form (rename scores dropped), in our order.
+fn raw(files: &[ChangedFile]) -> Vec<String> {
     files
         .iter()
-        .map(|file| match file.kind {
-            ChangeKind::Added => format!("A {}", file.path()),
-            ChangeKind::Deleted => format!("D {}", file.path()),
-            ChangeKind::Modified => format!("M {}", file.path()),
-            ChangeKind::Renamed => format!(
-                "R {} {}",
-                file.old.as_ref().unwrap().path,
-                file.new.as_ref().unwrap().path
-            ),
+        .map(|file| {
+            let (old_mode, old_id, old_path) = side(file.old.as_ref());
+            let (new_mode, new_id, new_path) = side(file.new.as_ref());
+            let (status, paths) = match file.kind {
+                ChangeKind::Added => ("A", file.path().to_owned()),
+                ChangeKind::Deleted => ("D", file.path().to_owned()),
+                ChangeKind::Modified => ("M", file.path().to_owned()),
+                ChangeKind::TypeChanged => ("T", file.path().to_owned()),
+                ChangeKind::Renamed => ("R", format!("{old_path} -> {new_path}")),
+            };
+            format!(":{old_mode} {new_mode} {old_id} {new_id} {status} {paths}")
         })
         .collect()
 }
 
-/// `git diff --name-status -M -z` in the same form, sorted by path shown.
-fn git_name_status(repo: &TestRepo, base: &str, head: &str) -> Vec<String> {
-    let raw = repo.git(&["diff", "--name-status", "-M", "-z", base, head]);
-    let mut fields = raw.split('\0').filter(|f| !f.is_empty());
+/// `git diff --raw -M -z --abbrev=40` in the same form, in Git's order.
+fn git_raw(repo: &TestRepo, base: &str, head: &str) -> Vec<String> {
+    let output = repo.git(&["diff", "--raw", "-M", "-z", "--abbrev=40", base, head]);
+    let mut fields = output.split('\0').filter(|f| !f.is_empty());
     let mut out = Vec::new();
-    while let Some(status) = fields.next() {
+    while let Some(meta) = fields.next() {
+        let parts: Vec<&str> = meta.split(' ').collect();
+        let status = &parts[4][..1];
         let first = fields.next().unwrap();
-        if status.starts_with('R') {
-            let second = fields.next().unwrap();
-            out.push((second.to_owned(), format!("R {first} {second}")));
+        let paths = if status == "R" {
+            format!("{first} -> {}", fields.next().unwrap())
         } else {
-            out.push((first.to_owned(), format!("{} {first}", &status[..1])));
-        }
+            first.to_owned()
+        };
+        out.push(format!(
+            "{} {} {} {} {status} {paths}",
+            parts[0], parts[1], parts[2], parts[3]
+        ));
     }
-    out.sort();
-    out.into_iter().map(|(_, line)| line).collect()
+    out
 }
 
 fn changes(repo: &TestRepo, base: &str, head: &str) -> Vec<ChangedFile> {
-    let opened = Repo::open(repo.path()).unwrap();
+    let opened = Repo::open(&repo.path()).unwrap();
     let base = opened.resolve_commit(base).unwrap();
     let head = opened.resolve_commit(head).unwrap();
     opened.changed_files(base, head).unwrap()
@@ -72,11 +96,16 @@ fn changed_files_match_git_name_status() {
     repo.git(&["update-index", "--chmod=+x", "scripts/build.sh"]);
     let head = repo.commit_index("head");
 
-    let ours = name_status(&changes(&repo, &base, &head));
-    let git = git_name_status(&repo, &base, &head);
-    assert_eq!(ours, git);
-    assert!(ours.contains(&"R src/FrameAnalyzer.cs src/Scanning/FrameAnalyzer.cs".to_owned()));
-    assert!(ours.contains(&"M scripts/build.sh".to_owned()));
+    let ours = raw(&changes(&repo, &base, &head));
+    assert_eq!(ours, git_raw(&repo, &base, &head));
+    assert!(
+        ours.iter()
+            .any(|l| l.ends_with(" R src/FrameAnalyzer.cs -> src/Scanning/FrameAnalyzer.cs"))
+    );
+    assert!(
+        ours.iter()
+            .any(|l| l.starts_with(":100644 100755 ") && l.ends_with(" M scripts/build.sh"))
+    );
 }
 
 #[test]
@@ -102,7 +131,7 @@ fn reports_entry_kinds_for_mode_and_submodule_changes() {
     let head = repo.commit_index("head");
 
     let files = changes(&repo, &base, &head);
-    assert_eq!(name_status(&files), git_name_status(&repo, &base, &head));
+    assert_eq!(raw(&files), git_raw(&repo, &base, &head));
 
     let script = files.iter().find(|f| f.path() == "run.sh").unwrap();
     assert_eq!(script.old.as_ref().unwrap().kind, EntryKind::File);
@@ -118,11 +147,65 @@ fn reports_entry_kinds_for_mode_and_submodule_changes() {
 }
 
 #[test]
+fn directory_rename_lists_every_file_like_git() {
+    let mut repo = TestRepo::new();
+    for name in ["Camera", "Frame", "Scanner"] {
+        repo.write(
+            &format!("src/Old/{name}.cs"),
+            format!("namespace App;\n\npublic sealed class {name}\n{{\n    public int Id {{ get; set; }}\n}}\n"),
+        );
+    }
+    repo.write("src/Other.cs", "class Other {}\n");
+    let base = repo.commit("base");
+    repo.git(&["mv", "src/Old", "src/New"]);
+    repo.write(
+        "src/New/Frame.cs",
+        "namespace App;\n\npublic sealed class Frame\n{\n    public int Id { get; set; }\n    public int Width { get; set; }\n}\n",
+    );
+    let head = repo.commit("rename directory");
+
+    let ours = raw(&changes(&repo, &base, &head));
+    assert_eq!(ours, git_raw(&repo, &base, &head));
+    assert_eq!(ours.len(), 3, "{ours:#?}");
+}
+
+#[test]
+fn type_change_between_file_and_symlink_is_reported_like_git() {
+    let mut repo = TestRepo::new();
+    repo.write("config/app.json", "{}\n");
+    let base = repo.commit("file");
+    // A symlink entry via the index works on Windows without symlink rights.
+    let link = repo.git_with_stdin(&["hash-object", "-w", "--stdin"], "../shared/app.json");
+    repo.git(&[
+        "update-index",
+        "--cacheinfo",
+        &format!("120000,{link},config/app.json"),
+    ]);
+    let head = repo.commit_index("symlink");
+
+    let files = changes(&repo, &base, &head);
+    assert_eq!(raw(&files), git_raw(&repo, &base, &head));
+    assert_eq!(files[0].kind, ChangeKind::TypeChanged);
+    assert_eq!(files[0].new.as_ref().unwrap().kind, EntryKind::Symlink);
+}
+
+#[test]
+fn reading_a_tree_as_blob_is_an_error() {
+    let mut repo = TestRepo::new();
+    repo.write("src/a.txt", "a\n");
+    repo.commit("first");
+    let tree = repo.git(&["rev-parse", "HEAD:src"]);
+    let opened = Repo::open(&repo.path()).unwrap();
+    let error = opened.read_blob(tree.parse().unwrap()).unwrap_err();
+    assert!(matches!(error, GitError::NotABlob { .. }), "{error:?}");
+}
+
+#[test]
 fn reads_blob_content_byte_for_byte() {
     let mut repo = TestRepo::new();
     repo.write("docs/Windows.txt", "a\r\nb\r\n");
     let commit = repo.commit("crlf");
-    let opened = Repo::open(repo.path()).unwrap();
+    let opened = Repo::open(&repo.path()).unwrap();
     assert_eq!(opened.resolve_commit("HEAD").unwrap().to_string(), commit);
     let blob = repo.git(&["rev-parse", "HEAD:docs/Windows.txt"]);
     assert_eq!(
@@ -145,7 +228,7 @@ fn merge_base_matches_git() {
     repo.write("main.txt", "m\n");
     let main = repo.commit("main work");
 
-    let opened = Repo::open(repo.path()).unwrap();
+    let opened = Repo::open(&repo.path()).unwrap();
     let base = opened
         .merge_base(main.parse().unwrap(), feature.parse().unwrap())
         .unwrap();
@@ -162,7 +245,7 @@ fn resolves_branch_tag_and_relative_revisions() {
     let second = repo.commit("second");
     repo.git(&["tag", "-a", "v1", "-m", "annotated", &first]);
 
-    let opened = Repo::open(repo.path()).unwrap();
+    let opened = Repo::open(&repo.path()).unwrap();
     assert_eq!(opened.resolve_commit("main").unwrap().to_string(), second);
     assert_eq!(opened.resolve_commit("HEAD~1").unwrap().to_string(), first);
     assert_eq!(opened.resolve_commit("v1").unwrap().to_string(), first);
@@ -177,11 +260,14 @@ fn reports_unknown_revision_and_non_commit_objects() {
     let mut repo = TestRepo::new();
     repo.write("a.txt", "1\n");
     repo.commit("first");
-    let opened = Repo::open(repo.path()).unwrap();
+    let opened = Repo::open(&repo.path()).unwrap();
 
     let unknown = opened.resolve_commit("no-such-branch").unwrap_err();
     assert!(matches!(unknown, GitError::UnknownRevision { .. }));
-    assert_eq!(unknown.to_string(), "revision no-such-branch not found");
+    assert_eq!(
+        unknown.to_string(),
+        "cannot resolve revision no-such-branch"
+    );
 
     let blob = opened.resolve_commit("HEAD:a.txt").unwrap_err();
     assert!(matches!(blob, GitError::NotACommit { .. }), "{blob:?}");

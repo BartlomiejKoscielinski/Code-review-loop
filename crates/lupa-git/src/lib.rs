@@ -20,7 +20,7 @@ pub enum GitError {
         #[source]
         source: Box<dyn std::error::Error + Send + Sync>,
     },
-    #[error("revision {revision} not found")]
+    #[error("cannot resolve revision {revision}")]
     UnknownRevision {
         revision: String,
         #[source]
@@ -30,6 +30,15 @@ pub enum GitError {
     NotACommit { revision: String },
     #[error("commits {one} and {two} have no common ancestor")]
     NoMergeBase { one: ObjectId, two: ObjectId },
+    #[error("cannot compute the merge base of {one} and {two}")]
+    MergeBase {
+        one: ObjectId,
+        two: ObjectId,
+        #[source]
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
+    #[error("object {id} is not a file (blob)")]
+    NotABlob { id: ObjectId },
     #[error("cannot read object {id}")]
     Object {
         id: ObjectId,
@@ -46,17 +55,20 @@ pub enum GitError {
 }
 
 /// How a file changed between two commits, as in `git diff --name-status -M`.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ChangeKind {
     Added,
     Deleted,
-    /// Content, mode or submodule pointer changed.
+    /// Content, executable bit or submodule pointer changed.
     Modified,
     Renamed,
+    /// The entry became a different kind (file, symlink or submodule): `T` in
+    /// Git. A line diff between the two sides is meaningless.
+    TypeChanged,
 }
 
 /// Kind of tree entry on one side of a change.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum EntryKind {
     File,
     Executable,
@@ -65,17 +77,31 @@ pub enum EntryKind {
     Submodule,
 }
 
+impl EntryKind {
+    /// Git's type classes: a regular and an executable file are the same type.
+    fn same_type(self, other: Self) -> bool {
+        let class = |kind| match kind {
+            EntryKind::File | EntryKind::Executable => 0,
+            EntryKind::Symlink => 1,
+            EntryKind::Submodule => 2,
+        };
+        class(self) == class(other)
+    }
+}
+
 /// One side of a change: path, object id and entry kind.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileVersion {
     /// Path relative to the repository root, `/`-separated as Git stores it.
+    /// Non-UTF-8 bytes (rare, only in repositories created on Linux) are
+    /// replaced, so such a path cannot be mapped back to a working tree file.
     pub path: String,
     pub id: ObjectId,
     pub kind: EntryKind,
 }
 
 /// A file that differs between two commits.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChangedFile {
     pub kind: ChangeKind,
     /// Absent for added files.
@@ -135,8 +161,9 @@ impl Repo {
         match self.inner.merge_base(one, two) {
             Ok(Some(id)) => Ok(id.detach()),
             Ok(None) => Err(GitError::NoMergeBase { one, two }),
-            Err(source) => Err(GitError::Object {
-                id: one,
+            Err(source) => Err(GitError::MergeBase {
+                one,
+                two,
                 source: Box::new(source),
             }),
         }
@@ -181,6 +208,9 @@ impl Repo {
                 id,
                 source: Box::new(source),
             })?;
+        if object.kind != gix::object::Kind::Blob {
+            return Err(GitError::NotABlob { id });
+        }
         Ok(object.detach().data)
     }
 
@@ -248,15 +278,20 @@ fn to_changed_file(change: ChangeDetached) -> Option<ChangedFile> {
             entry_mode,
             id,
             location,
-        } => Some(ChangedFile {
-            kind: ChangeKind::Modified,
-            old: Some(version(
-                location.as_ref(),
-                previous_id,
-                previous_entry_mode,
-            )?),
-            new: Some(version(location.as_ref(), id, entry_mode)?),
-        }),
+        } => {
+            let old = version(location.as_ref(), previous_id, previous_entry_mode)?;
+            let new = version(location.as_ref(), id, entry_mode)?;
+            let kind = if old.kind.same_type(new.kind) {
+                ChangeKind::Modified
+            } else {
+                ChangeKind::TypeChanged
+            };
+            Some(ChangedFile {
+                kind,
+                old: Some(old),
+                new: Some(new),
+            })
+        }
         ChangeDetached::Rewrite {
             source_location,
             source_entry_mode,
