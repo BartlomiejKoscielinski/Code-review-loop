@@ -45,9 +45,9 @@ pub enum GitError {
         #[source]
         source: Box<dyn std::error::Error + Send + Sync>,
     },
-    #[error("cannot compare trees of {base} and {head}")]
+    #[error("cannot compare trees of {} and {head}", base.map_or("the empty tree".to_owned(), |id| id.to_string()))]
     TreeDiff {
-        base: ObjectId,
+        base: Option<ObjectId>,
         head: ObjectId,
         #[source]
         source: Box<dyn std::error::Error + Send + Sync>,
@@ -169,11 +169,25 @@ impl Repo {
         }
     }
 
+    /// Parent commits of `commit`, first parent first (none for a root commit).
+    pub fn parents(&self, commit: ObjectId) -> Result<Vec<ObjectId>, GitError> {
+        let object_error = |source: Box<dyn std::error::Error + Send + Sync>| GitError::Object {
+            id: commit,
+            source,
+        };
+        let commit = self
+            .inner
+            .find_commit(commit)
+            .map_err(|source| object_error(Box::new(source)))?;
+        Ok(commit.parent_ids().map(|id| id.detach()).collect())
+    }
+
     /// Files that differ between the trees of `base` and `head`, with rename
-    /// detection at 50% similarity like `git diff -M`. Sorted by path.
+    /// detection at 50% similarity like `git diff -M`. A `None` base is the
+    /// empty tree (everything in `head` is added). Sorted by path.
     pub fn changed_files(
         &self,
-        base: ObjectId,
+        base: Option<ObjectId>,
         head: ObjectId,
     ) -> Result<Vec<ChangedFile>, GitError> {
         let tree_error = |source: Box<dyn std::error::Error + Send + Sync>| GitError::TreeDiff {
@@ -181,7 +195,10 @@ impl Repo {
             head,
             source,
         };
-        let old_tree = self.commit_tree(base)?;
+        let old_tree = match base {
+            Some(base) => self.commit_tree(base)?,
+            None => self.inner.empty_tree(),
+        };
         let new_tree = self.commit_tree(head)?;
         let mut options = gix::diff::Options::default();
         options.track_rewrites(Some(gix::diff::Rewrites {

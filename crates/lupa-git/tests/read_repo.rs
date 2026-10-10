@@ -64,7 +64,7 @@ fn changes(repo: &TestRepo, base: &str, head: &str) -> Vec<ChangedFile> {
     let opened = Repo::open(&repo.path()).unwrap();
     let base = opened.resolve_commit(base).unwrap();
     let head = opened.resolve_commit(head).unwrap();
-    opened.changed_files(base, head).unwrap()
+    opened.changed_files(Some(base), head).unwrap()
 }
 
 const SERVICE: &str = "namespace App.Services;\n\npublic sealed class FrameAnalyzer\n{\n    public int Threshold { get; set; } = 10;\n\n    public bool Analyze(int value)\n    {\n        return value > Threshold;\n    }\n}\n";

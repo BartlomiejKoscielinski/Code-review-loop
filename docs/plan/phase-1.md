@@ -125,12 +125,13 @@ Format każdego zadania: zależności, zakres, kryteria akceptacji (co uruchomi�
 
 ### 1.2 Źródła zmian
 
-#### P1-12 · Cel review: commit, zakres, branch
+#### P1-12 · Cel review: commit, zakres, branch ✅
 
 - **Zależy od:** P1-06, ADR 0003
 - **Zakres:** `lupa-review`: `ReviewTarget` dla `Commit` (względem rodzica; przy merge commicie wybór rodzica, domyślnie pierwszy), `Range` (`A..B`) i branch (`merge-base(target, source)` → `source`). Identyfikator celu stabilny między uruchomieniami.
 - **Kryteria akceptacji:** testy na repozytoriach z `lupa-testkit`: lista plików i hunki zgodne z `git diff A B`, `git show <sha>` (zwykły commit) i `git diff target...source`; merge commit z wyborem drugiego rodzica zgodny z `git diff <sha>^2 <sha>`; pierwszy commit w repo (bez rodzica) pokazuje wszystkie pliki jako dodane.
 - **Rozmiar:** ~300 LOC.
+- **Wynik:** merge-base w historii criss-cross wybiera ten sam commit co `git merge-base` (test `criss_cross_merge_base_matches_git`), co zamyka otwartą kwestię z ADR 0005.
 
 #### P1-13 · Cel review: lokalne zmiany
 

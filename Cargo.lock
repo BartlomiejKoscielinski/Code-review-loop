@@ -2708,6 +2708,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lupa-review"
+version = "0.1.0"
+dependencies = [
+ "lupa-git",
+ "lupa-testkit",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "lupa-testkit"
 version = "0.1.0"
 dependencies = [

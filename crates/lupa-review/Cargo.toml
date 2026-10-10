@@ -1,0 +1,15 @@
+[package]
+name = "lupa-review"
+version = "0.1.0"
+description = "Review targets for Lupa: what is compared with what (ADR 0003)"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+lupa-git = { version = "0.1.0", path = "../lupa-git" }
+thiserror = "2"
+
+[dev-dependencies]
+lupa-testkit = { path = "../lupa-testkit" }
