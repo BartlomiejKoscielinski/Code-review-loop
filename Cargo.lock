@@ -2711,6 +2711,7 @@ dependencies = [
 name = "lupa-review"
 version = "0.1.0"
 dependencies = [
+ "lupa-diff",
  "lupa-git",
  "lupa-testkit",
  "thiserror 2.0.21",

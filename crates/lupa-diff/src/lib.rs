@@ -14,7 +14,9 @@ pub struct DiffOptions {
     /// Unchanged lines shown around each change; Git's default is 3.
     pub context: u32,
     /// "Ignoruj wcięcia": lines that differ only in leading spaces and tabs
-    /// count as unchanged.
+    /// count as unchanged. Differs from Git's `-b` in two ways: inner spacing
+    /// and a trailing `\r` still count, and the slider heuristic sees lines
+    /// without their indentation, so block placement may differ more often.
     pub ignore_indentation: bool,
 }
 
@@ -135,6 +137,10 @@ fn to_u32(count: usize) -> u32 {
     u32::try_from(count).unwrap_or(u32::MAX)
 }
 
+// `imara-diff` itself is limited to `u32` lines; the counts above saturate
+// instead of wrapping, and the hunk arithmetic below saturates as well, so an
+// oversized input gives wrong ranges but never a panic.
+
 fn intern<'a>(
     old: &[&'a [u8]],
     new: &[&'a [u8]],
@@ -168,7 +174,7 @@ fn group(changes: Vec<Change>, context: u32, old_count: u32, new_count: u32) -> 
     for change in changes {
         let starts_new_hunk = hunks.last().is_none_or(|hunk| {
             let previous = hunk.changes[hunk.changes.len() - 1];
-            change.old.start - previous.old.end() > 2 * context
+            change.old.start - previous.old.end() > context.saturating_mul(2)
         });
         if starts_new_hunk {
             hunks.push(Hunk {
@@ -185,8 +191,8 @@ fn group(changes: Vec<Change>, context: u32, old_count: u32, new_count: u32) -> 
         let last = hunk.changes[hunk.changes.len() - 1];
         let before = context.min(first.old.start).min(first.new.start);
         let after = context
-            .min(old_count - last.old.end())
-            .min(new_count - last.new.end());
+            .min(old_count.saturating_sub(last.old.end()))
+            .min(new_count.saturating_sub(last.new.end()));
         hunk.old = LineRange {
             start: first.old.start - before,
             len: last.old.end() + after - (first.old.start - before),

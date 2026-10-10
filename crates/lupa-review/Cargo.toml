@@ -12,4 +12,5 @@ lupa-git = { version = "0.1.0", path = "../lupa-git" }
 thiserror = "2"
 
 [dev-dependencies]
+lupa-diff = { path = "../lupa-diff" }
 lupa-testkit = { path = "../lupa-testkit" }
