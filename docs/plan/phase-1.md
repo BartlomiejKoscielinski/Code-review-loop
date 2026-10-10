@@ -90,7 +90,7 @@ Format każdego zadania: zależności, zakres, kryteria akceptacji (co uruchomi�
 #### P1-07 · Migawka working tree ✅
 
 - **Zależy od:** P1-06
-- **Zakres:** zmiany staged, unstaged i nieśledzone względem wybranej bazy, z respektowaniem `.gitignore`. Zrealizowane: zmiany śledzonych plików z `git diff --raw -M <base>`, nieśledzone z `git ls-files --others --exclude-standard`, a treść nowej strony przez `git hash-object -w --stdin-paths` do osobnego magazynu obiektów w cache Lupy (`GIT_OBJECT_DIRECTORY`, repo dewelopera przez alternates). Bloby są więc po filtrach Gita (CRLF, LFS), a do repo dewelopera nic nie jest zapisywane. Identyfikator treści jest kluczem cache bez commita. Normalizacja końców linii zgodna z `core.autocrlf` i `.gitattributes`.
+- **Zakres:** zmiany staged, unstaged i nieśledzone względem wybranej bazy, z respektowaniem `.gitignore`. Zrealizowane według [ADR 0006](../adr/0006-local-changes-via-snapshot-index.md): kopia indeksu w cache Lupy, `git add -A` i `git write-tree` do osobnego magazynu obiektów, potem `git diff-tree -M`. Bloby są po filtrach Gita, a repo dewelopera zostaje nietknięte.
 - **Kryteria akceptacji:** testy: identyfikator pliku równy wynikowi `git hash-object`; plik ignorowany nie pojawia się; plik z CRLF w working tree i LF w indeksie przy `autocrlf=true` nie jest zmieniony; usunięty, ale nie zestage'owany plik jest widoczny jako usunięty.
 - **Rozmiar:** ~300 LOC.
 

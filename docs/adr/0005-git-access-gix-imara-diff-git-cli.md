@@ -1,6 +1,6 @@
 # 0005. Dostęp do Gita: gix, imara-diff i git CLI
 
-- Status: Zaakceptowany (decyzja techniczna delegowana przez @Bartka w sesji 2026-10-10, `docs/plan/decisions.md`)
+- Status: Zaakceptowany; punkt o working tree zastąpiony przez [0006](0006-local-changes-via-snapshot-index.md)
 - Data: 2026-10-10
 - Decydenci: @Bartek
 

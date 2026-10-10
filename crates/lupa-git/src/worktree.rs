@@ -1,209 +1,253 @@
 //! Local changes: the working tree (staged, unstaged and untracked files)
-//! compared with a commit.
+//! compared with a commit (ADR 0006).
 //!
-//! Everything goes through the `git` CLI (ADR 0005), so `.gitignore`,
-//! `.gitattributes`, `core.autocrlf` and clean filters such as LFS behave
-//! exactly as in Git. Working tree files are stored as blobs *after* Git's
-//! clean filters, in an object directory inside Lupa's cache: the diff then
-//! compares like with like (a CRLF checkout of an LF blob is unchanged), and
-//! nothing is written to the developer's repository.
+//! Git itself turns the working tree into a tree object: a copy of the index
+//! in Lupa's cache gets `git add -A`, then `git write-tree`. Objects go to an
+//! object directory in the cache and the repository's own objects are read
+//! through alternates, so the developer's index and object store stay
+//! untouched. Ignore rules, attributes, `core.autocrlf`, clean filters,
+//! symlinks, submodules and conflicts all behave exactly as in Git, and
+//! `git diff-tree -M` compares the snapshot with the base.
 
-use std::io::Write;
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use crate::{ChangeKind, ChangedFile, EntryKind, FileVersion, GitError, ObjectId};
 
-/// Object id of the empty tree, used as the base of a repository without commits.
-const EMPTY_TREE: &str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+/// Variables that would point Git at another repository, index or object
+/// store, or inject configuration from a parent `git -c` call.
+const REDIRECTING_VARIABLES: &[&str] = &[
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_COMMON_DIR",
+    "GIT_NAMESPACE",
+    "GIT_CONFIG_PARAMETERS",
+    "GIT_CONFIG_COUNT",
+];
 
-/// Working tree of a repository, with blobs stored in `cache_dir`.
+/// Working tree of a repository, snapshotted into `cache_dir`.
 pub struct WorkTree {
-    repo: PathBuf,
-    /// Lupa's object directory for working tree blobs.
-    objects: PathBuf,
-    /// The repository's own object directory, read through Git's alternates.
+    /// Top-level directory of the working tree.
+    top: PathBuf,
+    /// The repository's index (copied, never written).
+    index: PathBuf,
+    /// The repository's object directory (read through alternates).
     repo_objects: PathBuf,
+    /// Lupa's object directory for snapshot objects.
+    objects: PathBuf,
+    /// Lupa's copy of the index.
+    snapshot_index: PathBuf,
 }
 
 impl WorkTree {
-    /// `cache_dir` is created if missing; it must not be inside the repository.
-    pub fn new(repo: &Path, cache_dir: &Path) -> Result<Self, GitError> {
-        let objects = cache_dir.join("objects");
-        std::fs::create_dir_all(&objects).map_err(|source| git_error("create cache", source))?;
-        let repo_objects = output(
-            Command::new("git").arg("-C").arg(repo).args([
-                "rev-parse",
-                "--path-format=absolute",
-                "--git-path",
-                "objects",
-            ]),
+    /// Opens the working tree that contains `path`. `cache_dir` must be
+    /// outside the working tree; it is created if missing.
+    pub fn new(path: &Path, cache_dir: &Path) -> Result<Self, GitError> {
+        let top = PathBuf::from(output(
+            plain_git(path).args(["rev-parse", "--show-toplevel"]),
             "rev-parse",
-        )?;
+        )?);
+        let git_path = |name: &str| -> Result<PathBuf, GitError> {
+            Ok(PathBuf::from(output(
+                plain_git(&top).args(["rev-parse", "--path-format=absolute", "--git-path", name]),
+                "rev-parse",
+            )?))
+        };
+        let index = git_path("index")?;
+        let repo_objects = git_path("objects")?;
+        if is_inside(cache_dir, &top) {
+            return Err(GitError::Command {
+                command: "snapshot".to_owned(),
+                detail: format!(
+                    "cache directory {} is inside the working tree {}",
+                    cache_dir.display(),
+                    top.display()
+                ),
+            });
+        }
+        let objects = cache_dir.join("objects");
+        std::fs::create_dir_all(&objects).map_err(|error| io_failed("create cache", &error))?;
         Ok(Self {
-            repo: repo.to_owned(),
+            snapshot_index: cache_dir.join("index"),
+            top,
+            index,
+            repo_objects,
             objects,
-            repo_objects: PathBuf::from(repo_objects.trim_end()),
         })
     }
 
-    /// Files in the working tree that differ from `base` (`None` = empty tree):
-    /// tracked changes with renames as `git diff -M <base>`, plus untracked
-    /// files that are not ignored. Sorted by path.
+    /// Files whose working tree content differs from `base` (`None` = the
+    /// empty tree), with renames as `git diff -M`. Sorted by path.
+    ///
+    /// The snapshot reflects content, not staging: a file removed from the
+    /// index but still on disk with the same content is unchanged.
     pub fn changed_files(&self, base: Option<ObjectId>) -> Result<Vec<ChangedFile>, GitError> {
-        let base = base.map_or_else(|| EMPTY_TREE.to_owned(), |id| id.to_string());
-        let raw = output(
-            &mut self.git(&[
-                "diff",
-                "--raw",
+        let tree = self.snapshot()?;
+        let base = match base {
+            Some(commit) => commit.to_string(),
+            None => output(
+                self.git()
+                    .args(["hash-object", "-t", "tree", "--stdin"])
+                    .stdin(Stdio::null()),
+                "hash-object",
+            )?,
+        };
+        let raw = output_raw(
+            self.git().args([
+                "diff-tree",
+                "-r",
                 "-z",
                 "-M",
+                "--raw",
+                "--no-abbrev",
                 "--no-ext-diff",
-                "--no-textconv",
-                "--abbrev=40",
                 &base,
+                &tree.to_string(),
             ]),
-            "diff",
+            "diff-tree",
         )?;
         let mut files = parse_raw(&raw)?;
-        let untracked = output(
-            &mut self.git(&["ls-files", "--others", "--exclude-standard", "-z"]),
-            "ls-files",
-        )?;
-        for path in untracked.split('\0').filter(|path| !path.is_empty()) {
-            files.push(ChangedFile {
-                kind: ChangeKind::Added,
-                old: None,
-                new: Some(FileVersion {
-                    path: path.to_owned(),
-                    id: ObjectId::null(gix::hash::Kind::Sha1),
-                    kind: EntryKind::File,
-                }),
-            });
-        }
-        self.store_new_sides(&mut files)?;
-        // A file that only differs in stat information hashes to its old blob.
-        files.retain(|file| match (&file.old, &file.new) {
-            (Some(old), Some(new)) => {
-                old.id != new.id || old.kind != new.kind || old.path != new.path
-            }
-            _ => true,
-        });
         files.sort_by(|a, b| a.path().cmp(b.path()));
         Ok(files)
     }
 
-    /// Content of a blob from the repository or from the working tree store.
+    /// Writes the working tree as a tree object in Lupa's store.
+    pub fn snapshot(&self) -> Result<ObjectId, GitError> {
+        match std::fs::copy(&self.index, &self.snapshot_index) {
+            Ok(_) => {}
+            // No index yet: a repository where nothing was ever staged.
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                match std::fs::remove_file(&self.snapshot_index) {
+                    Ok(()) => {}
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(error) => return Err(io_failed("reset snapshot index", &error)),
+                }
+            }
+            Err(error) => return Err(io_failed("copy index", &error)),
+        }
+        output(self.git().args(["add", "-A"]), "add")?;
+        let tree = output(self.git().arg("write-tree"), "write-tree")?;
+        tree.parse().map_err(|_| GitError::Command {
+            command: "write-tree".to_owned(),
+            detail: format!("unexpected output {tree}"),
+        })
+    }
+
+    /// Content of a blob from the repository or from a snapshot.
     pub fn read_blob(&self, id: ObjectId) -> Result<Vec<u8>, GitError> {
         let out = self
-            .git(&["cat-file", "blob", &id.to_string()])
+            .git()
+            .args(["cat-file", "blob", &id.to_string()])
+            .stdin(Stdio::null())
             .output()
-            .map_err(|source| git_error("cat-file", source))?;
+            .map_err(|error| io_failed("cat-file", &error))?;
         if !out.status.success() {
-            return Err(GitError::NotABlob { id });
+            return Err(failed("cat-file", &out.stderr));
         }
         Ok(out.stdout)
     }
 
-    /// Hashes regular files on the new side through Git's clean filters and
-    /// stores them in Lupa's object directory.
-    fn store_new_sides(&self, files: &mut [ChangedFile]) -> Result<(), GitError> {
-        let mut regular: Vec<&mut FileVersion> = files
-            .iter_mut()
-            .filter_map(|file| file.new.as_mut())
-            .filter(|new| matches!(new.kind, EntryKind::File | EntryKind::Executable))
-            .collect();
-        if regular.is_empty() {
-            return Ok(());
-        }
-        let paths: String = regular
-            .iter()
-            .map(|new| format!("{}\n", new.path))
-            .collect();
-        let mut child = self
-            .git(&["hash-object", "-w", "--stdin-paths"])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|source| git_error("hash-object", source))?;
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin
-                .write_all(paths.as_bytes())
-                .map_err(|source| git_error("hash-object", source))?;
-        }
-        let out = child
-            .wait_with_output()
-            .map_err(|source| git_error("hash-object", source))?;
-        if !out.status.success() {
-            return Err(command_failed("hash-object", &out.stderr));
-        }
-        let ids = String::from_utf8_lossy(&out.stdout);
-        let mut ids = ids.lines();
-        for new in &mut regular {
-            let id = ids
-                .next()
-                .and_then(|line| line.parse().ok())
-                .ok_or_else(|| command_failed("hash-object", b"fewer ids than paths"))?;
-            new.id = id;
-        }
-        Ok(())
-    }
-
-    /// `git` in the repository, writing objects to Lupa's store and reading the
-    /// repository's objects through alternates.
-    fn git(&self, args: &[&str]) -> Command {
-        let mut command = Command::new("git");
+    /// `git` on the snapshot: Lupa's index and object store, the repository's
+    /// objects as alternates.
+    fn git(&self) -> Command {
+        let mut command = plain_git(&self.top);
         command
-            .arg("-C")
-            .arg(&self.repo)
-            .args(args)
+            .env("GIT_INDEX_FILE", &self.snapshot_index)
             .env("GIT_OBJECT_DIRECTORY", &self.objects)
-            .env("GIT_ALTERNATE_OBJECT_DIRECTORIES", &self.repo_objects)
-            .env("GIT_TERMINAL_PROMPT", "0");
+            .env(
+                "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+                quote_alternate(&self.repo_objects),
+            );
         command
     }
 }
 
-/// Parses `git diff --raw -z --abbrev=40` records.
-fn parse_raw(raw: &str) -> Result<Vec<ChangedFile>, GitError> {
-    let mut fields = raw.split('\0').filter(|field| !field.is_empty());
+/// `git -C dir` without inherited redirections.
+fn plain_git(dir: &Path) -> Command {
+    let mut command = Command::new("git");
+    for variable in REDIRECTING_VARIABLES {
+        command.env_remove(variable);
+    }
+    command.env("GIT_TERMINAL_PROMPT", "0").arg("-C").arg(dir);
+    command
+}
+
+/// Git splits `GIT_ALTERNATE_OBJECT_DIRECTORIES` on `;` (Windows) or `:`
+/// (elsewhere) unless the entry is quoted C-style.
+fn quote_alternate(path: &Path) -> OsString {
+    let text = path.to_string_lossy();
+    let separator = if cfg!(windows) { ';' } else { ':' };
+    if !text.contains(separator) && !text.starts_with('"') {
+        return path.as_os_str().to_owned();
+    }
+    let escaped = text.replace('\\', "\\\\").replace('"', "\\\"");
+    OsString::from(format!("\"{escaped}\""))
+}
+
+/// True when `path` is `root` or below it, ignoring case on Windows.
+fn is_inside(path: &Path, root: &Path) -> bool {
+    let normalize = |p: &Path| {
+        let absolute = std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+        let text = absolute.to_string_lossy().replace('\\', "/");
+        if cfg!(windows) {
+            text.to_lowercase()
+        } else {
+            text
+        }
+    };
+    let (path, root) = (normalize(path), normalize(root));
+    path == root || path.starts_with(&format!("{}/", root.trim_end_matches('/')))
+}
+
+/// Parses `git diff-tree --raw -z --no-abbrev` records. Unknown statuses or
+/// modes are errors, never guesses.
+fn parse_raw(raw: &[u8]) -> Result<Vec<ChangedFile>, GitError> {
+    let mut fields = raw
+        .split(|&byte| byte == 0)
+        .filter(|field| !field.is_empty());
     let mut files = Vec::new();
     while let Some(meta) = fields.next() {
+        let meta = String::from_utf8_lossy(meta);
+        let bad = || failed("diff-tree", format!("unexpected record {meta}").as_bytes());
         let parts: Vec<&str> = meta.trim_start_matches(':').split(' ').collect();
         let [old_mode, new_mode, old_id, new_id, status] = parts[..] else {
-            return Err(command_failed("diff", meta.as_bytes()));
+            return Err(bad());
         };
-        let first = fields.next().unwrap_or_default().to_owned();
-        let letter = status.chars().next().unwrap_or('M');
-        let second = if letter == 'R' || letter == 'C' {
-            fields.next().unwrap_or_default().to_owned()
-        } else {
-            first.clone()
+        let mut path = || -> Result<String, GitError> {
+            fields
+                .next()
+                .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
+                .ok_or_else(bad)
         };
-        let side = |mode: &str, id: &str, path: &str| -> Option<FileVersion> {
-            Some(FileVersion {
-                path: path.to_owned(),
-                id: id.parse().ok()?,
-                kind: kind_from_mode(mode)?,
+        let first = path()?;
+        let (kind, second) = match status.chars().next() {
+            Some('A') => (ChangeKind::Added, first.clone()),
+            Some('D') => (ChangeKind::Deleted, first.clone()),
+            Some('M') => (ChangeKind::Modified, first.clone()),
+            Some('T') => (ChangeKind::TypeChanged, first.clone()),
+            Some('R') => (ChangeKind::Renamed, path()?),
+            _ => return Err(bad()),
+        };
+        let side = |mode: &str, id: &str, path: String| -> Result<FileVersion, GitError> {
+            Ok(FileVersion {
+                path,
+                id: id.parse().map_err(|_| bad())?,
+                kind: kind_from_mode(mode).ok_or_else(bad)?,
             })
-        };
-        let old = side(old_mode, old_id, &first);
-        let new = side(new_mode, new_id, &second);
-        let kind = match letter {
-            'A' => ChangeKind::Added,
-            'D' => ChangeKind::Deleted,
-            'R' => ChangeKind::Renamed,
-            'T' => ChangeKind::TypeChanged,
-            _ => ChangeKind::Modified,
         };
         files.push(ChangedFile {
             kind,
-            old: if kind == ChangeKind::Added { None } else { old },
-            new: if kind == ChangeKind::Deleted {
-                None
-            } else {
-                new
+            old: match kind {
+                ChangeKind::Added => None,
+                _ => Some(side(old_mode, old_id, first)?),
+            },
+            new: match kind {
+                ChangeKind::Deleted => None,
+                _ => Some(side(new_mode, new_id, second)?),
             },
         });
     }
@@ -220,25 +264,30 @@ fn kind_from_mode(mode: &str) -> Option<EntryKind> {
     }
 }
 
-fn output(command: &mut Command, what: &str) -> Result<String, GitError> {
+fn output_raw(command: &mut Command, what: &str) -> Result<Vec<u8>, GitError> {
     let out = command
         .stdin(Stdio::null())
         .output()
-        .map_err(|source| git_error(what, source))?;
+        .map_err(|error| io_failed(what, &error))?;
     if !out.status.success() {
-        return Err(command_failed(what, &out.stderr));
+        return Err(failed(what, &out.stderr));
     }
-    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    Ok(out.stdout)
 }
 
-fn git_error(what: &str, source: std::io::Error) -> GitError {
+fn output(command: &mut Command, what: &str) -> Result<String, GitError> {
+    let out = output_raw(command, what)?;
+    Ok(String::from_utf8_lossy(&out).trim_end().to_owned())
+}
+
+fn io_failed(what: &str, error: &std::io::Error) -> GitError {
     GitError::Command {
         command: what.to_owned(),
-        detail: source.to_string(),
+        detail: error.to_string(),
     }
 }
 
-fn command_failed(what: &str, stderr: &[u8]) -> GitError {
+fn failed(what: &str, stderr: &[u8]) -> GitError {
     GitError::Command {
         command: what.to_owned(),
         detail: String::from_utf8_lossy(stderr).trim().to_owned(),
